@@ -117,6 +117,12 @@ int main(void)
             sw2_activated = 0;
         }
 
+        //LED1
+        if(led1){
+            P1DIR |= BIT0;      // P1.0 output
+            //toggle LED D1
+            P1OUT ^= BIT0;
+        }
 
     }
 
