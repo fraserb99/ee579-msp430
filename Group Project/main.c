@@ -15,6 +15,11 @@ unsigned int held = 0;                  //checking if the button is being presse
 const int debounce = 328;               //count for the 50Hz, based on 32768/(2*x)= 50, want a 20ms wait for the debouncing, 1/20*10^-3 = 50
 const int count = 655;                  //count for the count, rate of 20Hz, based on 32768/(2x) = 20Hz
 
+//potentiometer stuff
+unsigned int orig_val = 0;              //Seting up value for original potentiometer vale
+unsigned int value = 0;                 //value on check
+signed int change = 0;                  //value to check how much the pot has changed
+const int step_size = 10;            //value to indicate step size
 //Booleans for the components
 //inputs
 unsigned int button = 0;                //Button
@@ -37,8 +42,12 @@ int main(void)
 {
 	WDTCTL = WDTPW | WDTHOLD;	// stop watchdog timer
 	
+	//stuff for testing
+	P1DIR |= BIT0;      // P1.0 output
+	button = 1;
 
-	//__bis_SR_register(GIE);                     //interrupt enabled (more intuitive, used better for assembly, suggested from TA)
+
+	__bis_SR_register(GIE);                     //interrupt enabled
 
     while(1){
         //read messages here
@@ -51,13 +60,28 @@ int main(void)
                 ADC10CTL1 = INCH_1 + ADC10SSEL_1;          // input A1, clock = ACLK
                 ADC10AE0 |= BIT1;                          // PA.1 ADC option select
 
+                //get original value
+                ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
+                orig_val = ADC10MEM;
                 pot_activated = 1;
             }
 
             ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
             //ADC10MEM = conversion result
             value = ADC10MEM;           //Just to make sure the value doesn't change during checking
-            //Code here for the potentiometer, so basically send stuff
+
+            if(value != orig_val){ //if value has changed
+                //check by how much
+                change = abs(orig_val - value);
+
+                if (change >= step_size){
+                    //send message
+                }
+
+                orig_val = value; //change to new orig value
+
+            }
+            //Code here for the potentiometer, so basically send stuff at interval checks
         } else {
             pot_activated = 0;
 
@@ -83,8 +107,8 @@ int main(void)
             }
         } else {
             b_activated = 0;                    //if button is no longer requested
-            TA0CTL ~= TAIE;                     //stop timer interrupt on TA0
-            P1IE ~= BIT3;                       //and button interrupt
+            TA0CTL &= ~TAIE;                     //stop timer interrupt on TA0
+            P1IE &= ~BIT3;                       //and button interrupt
         }
 
         //check if thermometer was requested
@@ -101,7 +125,7 @@ int main(void)
         if(switch1){
             if(!sw1_activated){
 
-                sw1_+activated = 1;
+                sw1_activated = 1;
             }
         } else {
             sw1_activated = 0;
@@ -111,7 +135,7 @@ int main(void)
         if(switch2){
             if(!sw2_activated){
 
-                sw2_+activated = 1;
+                sw2_activated = 1;
             }
         } else {
             sw2_activated = 0;
@@ -137,6 +161,8 @@ __interrupt void Timer0_A0 (void)
         timerCount += 1;
     } else if ((held == 1) && (P1IN & BIT3)){   //if button was released
         //send timer count signal here
+        //testing with light first
+        P1OUT ^= BIT0;
         held = 0;                               //button has now been released
 
     }
