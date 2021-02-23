@@ -41,11 +41,7 @@ unsigned int buzzer = 0;                //buzzer
 int main(void)
 {
 	WDTCTL = WDTPW | WDTHOLD;	// stop watchdog timer
-	
-	//stuff for testing
-	P1DIR |= BIT0 + BIT6;      // P1.0, P1.6 output
-	button = 1;
-	pot = 1;
+
 
 	__bis_SR_register(GIE);                     //interrupt enabled
 
@@ -99,8 +95,7 @@ int main(void)
 
                 if (change >= step_size){
                     //send message
-                    //testing light
-                    P1OUT ^= BIT6;
+
                 }
 
                 orig_val = value; //change to new orig value
@@ -164,8 +159,7 @@ __interrupt void Timer0_A0 (void)
         timerCount += 1;
     } else if ((held == 1) && (P1IN & BIT3)){   //if button was released
         //send timer count signal here
-        //testing with light first
-        P1OUT ^= BIT0;
+
         held = 0;                               //button has now been released
 
     }
