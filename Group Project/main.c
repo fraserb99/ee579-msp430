@@ -62,6 +62,7 @@ int main(void)
     while(1){
         //read messages here
 
+
         //check if button was requested
         if (button){
             if (!b_activated){ //if not already activated
