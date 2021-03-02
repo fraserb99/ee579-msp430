@@ -54,8 +54,8 @@ int main(void)
 
 	//stuff for testing
 	P1DIR |= BIT0 + BIT6;      // P1.0, P1.6 output
+	P2DIR |= BIT1;             //utilise D3
 	button = 1;
-	thermometer = 1;
 
 	__bis_SR_register(GIE);                     //interrupt enabled
 
@@ -89,20 +89,23 @@ int main(void)
 
         //need checks to see if potentiometer was requested
         if (pot){
-            /*if(!pot_activated){ //if not already activated
-                ADC12CTL0 = ADC12ON + CONSEQ_2;            // ADC10ON, single channel repeat mode
-                ADC12CTL1 = INCH_1 + ADC12SSEL_1 + CSTARTADD_0;          // input A1, clock = ACLK, MEM0
-                ADC12AE0 |= BIT1;                          // PA.1 ADC option select
+            if(!pot_activated){ //if not already activated
+                ADC10CTL0 = ADC10ON + CONSEQ_0;            // ADC10ON, single channel single sample
+                ADC10CTL1 = INCH_1 + ADC10SSEL_1;          // input A1, clock = ACLK
+                ADC10AE0 |= BIT1;                          // PA.1 ADC option select
 
                 //get original value
-                ADC12CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
-                orig_val = ADC12MEM0;
+                ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
+                orig_val = ADC10MEM;
                 pot_activated = 1;
             }
 
-            ADC12CTL0 |= ENC + ADC12SC;             // Sampling and conversion start
+            ADC10CTL1 = INCH_1;                     //Ensure right channel
+            ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
             //ADC10MEM = conversion result
-            value = ADC12MEM0;           //Just to make sure the value doesn't change during checking
+            value = ADC10MEM;           //Just to make sure the value doesn't change during checking
+            //reset ENC
+            ADC10CTL0 &= ~ENC;
 
             if(value != orig_val){ //if value has changed
                 //check by how much
@@ -111,13 +114,13 @@ int main(void)
                 if (change >= step_size){
                     //send message
                     //testing light
-                    P1OUT ^= BIT6;
+                    P2OUT ^= BIT1;
                 }
 
                 orig_val = value; //change to new orig value
 
             }
-            //Code here for the potentiometer, so basically send stuff at interval checks*/
+            //Code here for the potentiometer, so basically send stuff at interval checks
         } else {
             pot_activated = 0;
 
@@ -140,10 +143,13 @@ int main(void)
             }
 
             if (sample_temp){
+                ADC10CTL1 = INCH_10;                //Ensure right channel
                 ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
                 //based on code for pot above
                 //ADC10MEM = conversion result
                 temp = ADC10MEM;           //Just to make sure the value doesn't change during checking
+                //reset ENC
+                ADC10CTL0 &= ~ENC;
                 value_temp = ((temp - 673) * 423) / 1024;
 
                 if(value_temp != orig_temp){ //if value has changed
@@ -280,17 +286,3 @@ __interrupt void Timer1_A0 (void)
     }
 }
 
-//testing if it will stop the trap
-/*
-#pragma vector=TIMER1_A1_VECTOR
-__interrupt void Timer1_A1(void){
-    switch(TA0IV)
-    {
-    case  2:
-            break;
-
-    case 10: break;                             //Timer_A3 overflow, don't need to do anything
-
-    }
-}
-*/
