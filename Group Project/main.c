@@ -103,6 +103,9 @@ int activate_timer(int timer_no, int count1, int count2);       //function for a
 int activate_free_timer(int registers, int counts[]);           //function for activating required number of free timers
 void deactivate_timer(int activated[], int len);                 //deactivate unused timers
 
+
+//TODO: Add interrupts for blinking LEDs, and add checks for the other oputput potentials.
+
 //main function
 int main(void)
 {
