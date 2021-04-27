@@ -59,7 +59,7 @@ signed int led1_fade_in = -1;                   //LED1 fade in
 signed int led1_fade_out = -1;                  //LED1 fade out
 signed int led1_breath = -1;                    //LED1 blinking light
 unsigned int blink_rate_1 = 16384;              //rate for the blinking light of LED D1, default period 1Hz
-unsigned int breath_flag_1 = 0;                 //breathing light boolean for fading in or out
+unsigned int light_flag_1 = 0;                  //breathing and fading light flag, brighter or darker,  brighter = 0, darker = 1;
 unsigned int brightness_1 = 0;                  // Varies brightness between 0 and 32
 unsigned int counter_val_1 = 0;                 //counter for the LED on time
 unsigned int period_1 = 2048;                   //overall period for the fading and breathing light, default is 2Hz
@@ -68,16 +68,16 @@ int activated_led1[];                           //Array for activated timers for
 //LED2 stuff
 signed int led2_on = 0;                         //LED D2 on
 unsigned int led2_active = 0;                   //LED2 active
+unsigned int led2_fo_active = 0;                //own activation check for fade out as that can turn lights of that are on, if wanted
 signed int led2_blink = -1;                     //LED2 blink
 signed int led2_fade_in = -1;                   //LED2 fade in
 signed int led2_fade_out = -1;                  //LED2 fade out
 signed int led2_breath = -1;                    //LED2 blinking light
 unsigned int blink_rate_2 = 16384;              //rate for the blinking light of LED D2, default period 1Hz
-signed int light_flag_2 = 0;                    //breathing and fading light flag, brighter or darker,  brighter = 1, darker = -1;
-signed int brightness_2 = 0;                    //used for determining brightness, initially between 0 and 4
-unsigned int flash_count_2 = 0;                 //LED counter
-unsigned int duty_cycle_2 = 1;                  //duty cycle for breathing and flashing, default
-unsigned int peroid_2 = 516;                    //period for flashing and breathing, default
+unsigned int light_flag_2 = 0;                  //breathing and fading light flag, brighter or darker,  brighter = 0, darker = 1;
+unsigned int brightness_2 = 0;                  //varies brightness between 0 and 32
+unsigned int counter_val_2 = 0;                 //LED counter
+unsigned int period_2 = 2048;                   //period for flashing and breathing, default
 int activated_led2[0];                          //Array for activated timers for LED D2
 
 //LED3 stuff
@@ -154,14 +154,14 @@ int main(void)
 	//button = 1;
 	//pot = 1;
 	//thermometer = 1;
-	//led2_blink = 1;
+	//led1_blink = 1;
 	//blink_rate_3 = 32768;
 	//led3_blink = 1;
 	//led3_rot = 1;
 	//led3_dir = 1;
-	led1_breath = 1;
-    //led1_fade_in = 1;
-	//led1_fade_out = 1;
+	led2_breath = 1;
+    //led2_fade_in = 1;
+	//led2_fade_out = 1;
 
 	__bis_SR_register(GIE);                     //interrupt enabled
 
@@ -395,7 +395,7 @@ int main(void)
                 //P1OUT ^= BIT6;
                 //set the brightness to max
                 brightness_1 = max_brightness;
-                breath_flag_1 = 1;
+                light_flag_1 = 1;
                 //need to turn on a light first, if not already on
                 P1OUT |= BIT0;
             }
@@ -472,7 +472,81 @@ int main(void)
         }
 
         //fade in
+        if(led2_fade_in > -1){
+            if(!led2_active){
+                P1DIR |= BIT6;
+                P1OUT &= ~BIT6; //don't want it on
+                //need 2 timers for the fading in
+                int counts[2] = {change_period, period_2};
+                led2_active = activate_free_timer(2, counts);
+                activated_led2[0] = activated_timers[0]; //record which ones were activated, first
+                activated_led2[1] = activated_timers[1]; //record second one
+                led2_fade_in = get_timer_code(activated_led2);
+                if (led2_active == 0) { //if return is anything but 0, has now been activated
+                    //something went wrong
+                }
+            }
 
+        } else if (led2_fade_in == -2){
+            led2_active = 0;
+            P1DIR &= ~BIT6;
+            deactivate_timer(activated_led2, 2);
+            led2_fade_in = -1;
+        }
+
+        //fade out
+        if(led2_fade_out > -1){
+            if(!led2_fo_active){ //if light hasn't been activated, or if on
+                P1DIR |= BIT6;
+                //need 2 timers for the fading in
+                int counts[2] = {change_period, period_2};
+                led2_fo_active = activate_free_timer(2, counts);
+                activated_led2[0] = activated_timers[0]; //record which ones were activated, first
+                activated_led2[1] = activated_timers[1]; //record second one
+                led2_fade_out = get_timer_code(activated_led2);
+                if (led2_fo_active == 0) { //if return is anything but 0, has now been activated
+                    //something went wrong
+                } else {
+                    led2_active = 1; //led is being used
+                }
+                //for testing
+                //P1OUT ^= BIT6;
+                //set the brightness to max
+                brightness_2 = max_brightness;
+                light_flag_2 = 1;
+                //need to turn on a light first, if not already on
+                P1OUT |= BIT6;
+            }
+
+        } else if (led2_fade_out == -2){
+            led2_fo_active = 0;
+            led2_active = 0;
+            P1DIR &= ~BIT6;
+            deactivate_timer(activated_led2, 2);
+            led2_fade_out = -1;
+        }
+
+        //breathing
+        if(led2_breath > -1){
+            if(!led2_active){
+                P1DIR |= BIT6;
+                //need 2 timers for the breathing light
+                int counts[2] = {change_period, period_2};
+                led2_active = activate_free_timer(2, counts);
+                activated_led2[0] = activated_timers[0]; //record which ones were activated, first
+                activated_led2[1] = activated_timers[1]; //record second one
+                led2_breath = get_timer_code(activated_led2);
+                if (led2_active == 0) { //if return is anything but 0, has now been activated
+                    //something went wrong
+                }
+            }
+
+        } else if (led2_breath == -2){
+            led2_active = 0;
+            P1DIR &= ~BIT6;
+            deactivate_timer(activated_led2, 2);
+            led2_breath = -1;
+        }
 
         //LED3 on/off
         if(led3_on){
@@ -627,6 +701,21 @@ __interrupt void Timer0_A0 (void)
         TA0CCR0 += blink_rate_2;
     }
 
+    //fading in/out and breathing, part 1, can be 10, 11, 12, 13, 14
+    if(((led2_fade_in >= 10) && (led2_fade_in <= 14)) || ((led2_fade_out >= 10) && (led2_fade_out <= 14)) || ((led2_breath >= 10) && (led2_breath <= 14))){
+        if(counter_val_2 < brightness_2){
+            P1OUT |= BIT6;                              //Turn on light
+        } else {
+            P1OUT &= ~BIT6;
+        }
+        counter_val_2 += 1;                             //Increment the value to read from the array
+
+        if(counter_val_2 >= max_brightness){                       //reached max value, reset
+            counter_val_2 = 0;
+        }
+        TA0CCR0 += change_period;
+    }
+
     //LED3 rotating
     if(led3_rot == 0){
         //verify boundaries
@@ -742,7 +831,7 @@ __interrupt void Timer0_A1(void){
 
         //fade in part 2
         if(led1_fade_in == 10) {
-            if(breath_flag_1 == 0){
+            if(light_flag_1 == 0){
                 brightness_1 += 1;                //increase brightness
             }
 
@@ -756,7 +845,7 @@ __interrupt void Timer0_A1(void){
 
         //fade out part 2
         if(led1_fade_out == 10) {
-            if(breath_flag_1 == 1) {
+            if(light_flag_1 == 1) {
                 brightness_1 -= 1;                //decrease brightness
             }
 
@@ -770,26 +859,85 @@ __interrupt void Timer0_A1(void){
 
         //breathing part 2
         if(led1_breath == 10){
-            if(breath_flag_1 == 0){
+            if(light_flag_1 == 0){
                 brightness_1 += 1;                //increase brightness
             } else {
                 brightness_1 -= 1;                //decrease brightness
             }
 
             if(brightness_1 == max_brightness){               //if max brightness
-                breath_flag_1 = 1;                //set to decrease
+                light_flag_1 = 1;                //set to decrease
             } else if (brightness_1 == 0) {       //reached lowest value
-                breath_flag_1 = 0;                //increase light
+                light_flag_1 = 0;                //increase light
             }
 
             TA0CCR1 += period_1;
         }
 
-
         //LED2 blinking
         if(led2_blink == 1){
             P1OUT ^= BIT6;
             TA0CCR1 += blink_rate_2;
+        }
+
+        //fading in/out and breathing, part 1, can be 15, 16, 17, or 18
+        if(((led2_fade_in >= 15) && (led2_fade_in <= 18)) || ((led2_fade_out >= 15) && (led2_fade_out <= 18)) || ((led2_breath >= 15) && (led2_breath <= 18))){
+            if(counter_val_2 < brightness_2){
+                P1OUT |= BIT6;                              //Turn on light
+            } else {
+                P1OUT &= ~BIT6;
+            }
+            counter_val_2 += 1;                             //Increment the value to read from the array
+
+            if(counter_val_2 >= max_brightness){                       //reached max value, reset
+                counter_val_2 = 0;
+            }
+            TA0CCR1 += change_period;
+        }
+
+        //fade in part 2
+        if(led2_fade_in == 10) {
+            if(light_flag_2 == 0){
+                brightness_2 += 1;                //increase brightness
+            }
+
+            if(brightness_2 == max_brightness){               //if max brightness
+                P1OUT |= BIT6;             //leave it on
+                led2_fade_in = -1;          //completed task
+            }
+
+            TA0CCR1 += period_2;
+        }
+
+        //fade out part 2
+        if(led2_fade_out == 10) {
+            if(light_flag_2 == 1) {
+                brightness_2 -= 1;                //decrease brightness
+            }
+
+             if (brightness_2 == 0) {       //reached lowest value
+                P1OUT &= ~BIT6;                 //keep light off
+                led2_fade_out = -2;          //completed task, deactivate it
+            }
+
+            TA0CCR1 += period_2;
+        }
+
+        //breathing part 2
+        if(led2_breath == 10){
+            if(light_flag_2 == 0){
+                brightness_2 += 1;                //increase brightness
+            } else {
+                brightness_2 -= 1;                //decrease brightness
+            }
+
+            if(brightness_2 == max_brightness){               //if max brightness
+                light_flag_2 = 1;                //set to decrease
+            } else if (brightness_2 == 0) {       //reached lowest value
+                light_flag_2 = 0;                //increase light
+            }
+
+            TA0CCR1 += period_2;
         }
 
         //LED3 rotating
@@ -901,7 +1049,7 @@ __interrupt void Timer0_A1(void){
 
         //fade in part 2
         if((led1_fade_in == 11) || (led1_fade_in == 15)) {
-            if(breath_flag_1 == 0){
+            if(light_flag_1 == 0){
                 brightness_1 += 1;                //increase brightness
             }
 
@@ -915,7 +1063,7 @@ __interrupt void Timer0_A1(void){
 
         //fade out part 2
         if((led1_fade_out == 11) || (led1_fade_out == 15)) {
-            if(breath_flag_1 == 1) {
+            if(light_flag_1 == 1) {
                 brightness_1 -= 1;                //decrease brightness
             }
 
@@ -928,26 +1076,86 @@ __interrupt void Timer0_A1(void){
         }
 
         //breathing part 2
-        if((led1_breath == 10) || (led1_breath == 15)){
-            if(breath_flag_1 == 0){
+        if((led1_breath == 11) || (led1_breath == 15)){
+            if(light_flag_1 == 0){
                 brightness_1 += 1;                //increase brightness
             } else {
                 brightness_1 -= 1;                //decrease brightness
             }
 
             if(brightness_1 == max_brightness){               //if max brightness
-                breath_flag_1 = 1;                //set to decrease
+                light_flag_1 = 1;                //set to decrease
             } else if (brightness_1 == 0) {       //reached lowest value
-                breath_flag_1 = 0;                //increase light
+                light_flag_1 = 0;                //increase light
             }
 
-            TA0CCR1 += period_1;
+            TA0CCR2 += period_1;
         }
 
         //LED2 blinking
         if(led2_blink == 2){
             P1OUT ^= BIT6;
             TA0CCR2 += blink_rate_2;
+        }
+
+        //fading in/out and breathing, part 1, can be 19, 20, or 21
+        if(((led2_fade_in >= 19) && (led2_fade_in <= 21)) || ((led2_fade_out >= 19) && (led2_fade_out <= 21)) || ((led2_breath >= 19) && (led2_breath <= 21))){
+            if(counter_val_2 < brightness_2){
+                P1OUT |= BIT6;                              //Turn on light
+            } else {
+                P1OUT &= ~BIT6;
+            }
+            counter_val_2 += 1;                             //Increment the value to read from the array
+
+            if(counter_val_2 >= max_brightness){                       //reached max value, reset
+                counter_val_2 = 0;
+            }
+            TA0CCR2 += change_period;
+        }
+
+        //fade in part 2
+        if((led2_fade_in == 11) || (led2_fade_in == 15)) {
+            if(light_flag_2 == 0){
+                brightness_2 += 1;                //increase brightness
+            }
+
+            if(brightness_2 == max_brightness){               //if max brightness
+                P1OUT |= BIT6;             //leave it on
+                led2_fade_in = -1;          //completed task
+            }
+
+            TA0CCR2 += period_2;
+        }
+
+        //fade out part 2
+        if((led2_fade_out == 11) || (led2_fade_out == 15)) {
+            if(light_flag_2 == 1) {
+                brightness_2 -= 1;                //decrease brightness
+            }
+
+             if(brightness_2 == 0) {       //reached lowest value
+                P1OUT &= ~BIT6;                 //keep light off
+                led2_fade_out = -2;          //completed task, deactivate it
+            }
+
+            TA0CCR2 += period_2;
+        }
+
+        //breathing part 2
+        if((led2_breath == 11) || (led2_breath == 15)){
+            if(light_flag_2 == 0){
+                brightness_2 += 1;                //increase brightness
+            } else {
+                brightness_2 -= 1;                //decrease brightness
+            }
+
+            if(brightness_2 == max_brightness){               //if max brightness
+                light_flag_2 = 1;                //set to decrease
+            } else if (brightness_2 == 0) {       //reached lowest value
+                light_flag_2 = 0;                //increase light
+            }
+
+            TA0CCR2 += period_2;
         }
 
         //LED3 rotating
@@ -1070,7 +1278,7 @@ __interrupt void Timer1_A0 (void)
 
     //fade in part 2
     if((led1_fade_in == 12) || (led1_fade_in == 16) || (led1_fade_in == 19)) {
-        if(breath_flag_1 == 0){
+        if(light_flag_1 == 0){
             brightness_1 += 1;                //increase brightness
         }
 
@@ -1084,7 +1292,7 @@ __interrupt void Timer1_A0 (void)
 
     //fade out part 2
     if((led1_fade_out == 12) || (led1_fade_out == 16) || (led1_fade_out == 19)) {
-        if(breath_flag_1 == 1) {
+        if(light_flag_1 == 1) {
             brightness_1 -= 1;                //decrease brightness
         }
 
@@ -1098,26 +1306,85 @@ __interrupt void Timer1_A0 (void)
 
     //breathing part 2
     if((led1_breath == 12) || (led1_breath == 16) || (led1_breath == 19)){
-        if(breath_flag_1 == 0){
+        if(light_flag_1 == 0){
             brightness_1 += 1;                //increase brightness
         } else {
             brightness_1 -= 1;                //decrease brightness
         }
 
         if(brightness_1 == max_brightness){               //if max brightness
-            breath_flag_1 = 1;                //set to decrease
+            light_flag_1 = 1;                //set to decrease
         } else if (brightness_1 == 0) {       //reached lowest value
-            breath_flag_1 = 0;                //increase light
+            light_flag_1 = 0;                //increase light
         }
 
         TA1CCR0 += period_1;
     }
 
-
     //LED2 blinking
     if(led2_blink == 3){
         P1OUT ^= BIT6;
         TA1CCR0 += blink_rate_2;
+    }
+
+    //fading in/out and breathing, part 1, can be 22 or 23
+    if(((led2_fade_in == 22) && (led2_fade_in == 23)) || ((led2_fade_out == 22) && (led2_fade_out == 23)) || ((led2_breath == 22) && (led2_breath == 23))){
+        if(counter_val_2 < brightness_2){
+            P1OUT |= BIT6;                              //Turn on light
+        } else {
+            P1OUT &= ~BIT6;
+        }
+        counter_val_2 += 1;                             //Increment the value to read from the array
+
+        if(counter_val_2 >= max_brightness){                       //reached max value, reset
+            counter_val_2 = 0;
+        }
+        TA1CCR0 += change_period;
+    }
+
+    //fade in part 2
+    if((led2_fade_in == 12) || (led2_fade_in == 16) || (led2_fade_in == 19)) {
+        if(light_flag_2 == 0){
+            brightness_2 += 1;                //increase brightness
+        }
+
+        if(brightness_2 == max_brightness){               //if max brightness
+            P1OUT |= BIT6;             //leave it on
+            led2_fade_in = -1;          //completed task
+        }
+
+        TA1CCR0 += period_2;
+    }
+
+    //fade out part 2
+    if((led2_fade_out == 12) || (led2_fade_out == 16) || (led2_fade_out == 19)) {
+        if(light_flag_2 == 1) {
+            brightness_2 -= 1;                //decrease brightness
+        }
+
+         if (brightness_2 == 0) {       //reached lowest value
+            P1OUT &= ~BIT6;                 //keep light off
+            led2_fade_out = -2;          //completed task, deactivate it
+        }
+
+        TA1CCR0 += period_2;
+    }
+
+    //breathing part 2
+    if((led2_breath == 12) || (led2_breath == 16) || (led2_breath == 19)){
+        if(light_flag_2 == 0){
+            brightness_2 += 1;                //increase brightness
+        } else {
+            brightness_2 -= 1;                //decrease brightness
+        }
+
+        if(brightness_2 == max_brightness){               //if max brightness
+            light_flag_2 = 1;                //set to decrease
+        } else if (brightness_2 == 0) {       //reached lowest value
+            light_flag_2 = 0;                //increase light
+        }
+
+        TA1CCR0 += period_2;
     }
 
     //LED3 rotating
@@ -1217,7 +1484,7 @@ __interrupt void Timer1_A1(void){
 
         //fade in part 2
         if((led1_fade_in == 13) || (led1_fade_in == 17) || (led1_fade_in == 20) || (led1_fade_in == 22)) {
-            if(breath_flag_1 == 0){
+            if(light_flag_1 == 0){
                 brightness_1 += 1;                //increase brightness
             }
 
@@ -1231,7 +1498,7 @@ __interrupt void Timer1_A1(void){
 
         //fade out part 2
         if((led1_fade_out == 13) || (led1_fade_out == 17) || (led1_fade_out == 20) || (led1_fade_out == 22)) {
-            if(breath_flag_1 == 1) {
+            if(light_flag_1 == 1) {
                 brightness_1 -= 1;                //decrease brightness
             }
 
@@ -1245,16 +1512,16 @@ __interrupt void Timer1_A1(void){
 
         //breathing part 2
         if((led1_breath == 13) || (led1_breath == 17) || (led1_breath == 20) || (led1_breath == 22)){
-            if(breath_flag_1 == 0){
+            if(light_flag_1 == 0){
                 brightness_1 += 1;                //increase brightness
             } else {
                 brightness_1 -= 1;                //decrease brightness
             }
 
             if(brightness_1 == max_brightness){               //if max brightness
-                breath_flag_1 = 1;                //set to decrease
+                light_flag_1 = 1;                //set to decrease
             } else if (brightness_1 == 0) {       //reached lowest value
-                breath_flag_1 = 0;                //increase light
+                light_flag_1 = 0;                //increase light
             }
 
             TA1CCR1 += period_1;
@@ -1264,6 +1531,66 @@ __interrupt void Timer1_A1(void){
         if(led2_blink == 4){
             P1OUT ^= BIT6;
             TA1CCR1 += blink_rate_2;
+        }
+
+        //fading in/out and breathing, part 1, can be 24
+        if((led2_fade_in == 22) || (led2_fade_out == 24) || (led2_breath == 24)){
+            if(counter_val_2 < brightness_2){
+                P1OUT |= BIT6;                              //Turn on light
+            } else {
+                P1OUT &= ~BIT6;
+            }
+            counter_val_2 += 1;                             //Increment the value to read from the array
+
+            if(counter_val_2 >= max_brightness){                       //reached max value, reset
+                counter_val_2 = 0;
+            }
+            TA1CCR1 += change_period;
+        }
+
+        //fade in part 2
+        if((led2_fade_in == 13) || (led2_fade_in == 17) || (led2_fade_in == 20) || (led2_fade_in == 22)) {
+            if(light_flag_2 == 0){
+                brightness_2 += 1;                //increase brightness
+            }
+
+            if(brightness_2 == max_brightness){               //if max brightness
+                P1OUT |= BIT6;             //leave it on
+                led2_fade_in = -1;          //completed task
+            }
+
+            TA1CCR1 += period_2;
+        }
+
+        //fade out part 2
+        if((led2_fade_out == 13) || (led2_fade_out == 17) || (led2_fade_out == 20) || (led2_fade_out == 22)) {
+            if(light_flag_2 == 1) {
+                brightness_2 -= 1;                //decrease brightness
+            }
+
+             if (brightness_2 == 0) {       //reached lowest value
+                P1OUT &= ~BIT6;                 //keep light off
+                led2_fade_out = -2;          //completed task, deactivate it
+            }
+
+            TA1CCR1 += period_2;
+        }
+
+        //breathing part 2
+        if((led2_breath == 13) || (led2_breath == 17) || (led2_breath == 20) || (led2_breath == 22)){
+            if(light_flag_2 == 0){
+                brightness_2 += 1;                //increase brightness
+            } else {
+                brightness_2 -= 1;                //decrease brightness
+            }
+
+            if(brightness_2 == max_brightness){               //if max brightness
+                light_flag_2 = 1;                //set to decrease
+            } else if (brightness_2 == 0) {       //reached lowest value
+                light_flag_2 = 0;                //increase light
+            }
+
+            TA1CCR1 += period_2;
         }
 
         //LED3 rotating
@@ -1357,7 +1684,7 @@ __interrupt void Timer1_A1(void){
 
         //fade in part 2
         if((led1_fade_in == 14) || (led1_fade_in == 18) || (led1_fade_in == 21) || (led1_fade_in == 23) || (led1_fade_in == 24)) {
-            if(breath_flag_1 == 0){
+            if(light_flag_1 == 0){
                 brightness_1 += 1;                //increase brightness
             }
 
@@ -1371,7 +1698,7 @@ __interrupt void Timer1_A1(void){
 
         //fade out part 2
         if((led1_fade_out == 14) || (led1_fade_out == 18) || (led1_fade_out == 21) || (led1_fade_out == 23) || (led1_fade_out == 24)) {
-            if(breath_flag_1 == 1) {
+            if(light_flag_1 == 1) {
                 brightness_1 -= 1;                //decrease brightness
             }
 
@@ -1385,16 +1712,16 @@ __interrupt void Timer1_A1(void){
 
         //breathing part 2
         if((led1_breath == 14) || (led1_breath == 18) || (led1_breath == 21) || (led1_breath == 23) || (led1_breath == 24)){
-            if(breath_flag_1 == 0){
+            if(light_flag_1 == 0){
                 brightness_1 += 1;                //increase brightness
             } else {
                 brightness_1 -= 1;                //decrease brightness
             }
 
             if(brightness_1 == max_brightness){               //if max brightness
-                breath_flag_1 = 1;                //set to decrease
+                light_flag_1 = 1;                //set to decrease
             } else if (brightness_1 == 0) {       //reached lowest value
-                breath_flag_1 = 0;                //increase light
+                light_flag_1 = 0;                //increase light
             }
 
             TA1CCR2 += period_1;
@@ -1404,6 +1731,51 @@ __interrupt void Timer1_A1(void){
         if(led2_blink == 5){
             P1OUT ^= BIT6;
             TA1CCR2 += blink_rate_2;
+        }
+
+        //fade in part 2
+        if((led2_fade_in == 14) || (led2_fade_in == 18) || (led2_fade_in == 21) || (led2_fade_in == 23) || (led2_fade_in == 24)) {
+            if(light_flag_2 == 0){
+                brightness_2 += 1;                //increase brightness
+            }
+
+            if(brightness_2 == max_brightness){               //if max brightness
+                P1OUT |= BIT6;             //leave it on
+                led2_fade_in = -1;          //completed task
+            }
+
+            TA1CCR2 += period_2;
+        }
+
+        //fade out part 2
+        if((led2_fade_out == 14) || (led2_fade_out == 18) || (led2_fade_out == 21) || (led2_fade_out == 23) || (led2_fade_out == 24)) {
+            if(light_flag_2 == 1) {
+                brightness_2 -= 1;                //decrease brightness
+            }
+
+             if(brightness_2 == 0) {       //reached lowest value
+                P1OUT &= ~BIT6;                 //keep light off
+                led2_fade_out = -2;          //completed task, deactivate it
+            }
+
+            TA1CCR2 += period_2;
+        }
+
+        //breathing part 2
+        if((led2_breath == 14) || (led2_breath == 18) || (led2_breath == 21) || (led2_breath == 23) || (led2_breath == 24)){
+            if(light_flag_2 == 0){
+                brightness_2 += 1;                //increase brightness
+            } else {
+                brightness_2 -= 1;                //decrease brightness
+            }
+
+            if(brightness_2 == max_brightness){               //if max brightness
+                light_flag_2 = 1;                //set to decrease
+            } else if (brightness_2 == 0) {       //reached lowest value
+                light_flag_2 = 0;                //increase light
+            }
+
+            TA1CCR2 += period_2;
         }
 
         //LED3 rotating
