@@ -129,7 +129,19 @@ void deactivate_timer(int activated[], int len);                //deactivate unu
 int get_timer_code(int timers[]);                               //get the specific timer code for 2 timers
 
 
-//TODO: Add interrupts for breathing LEDs.
+/* Description of codes used for the LEDs:
+ * for those with 1 timer:
+ * A0_0 = 0, A0_1 = 1, A0_2 = 2, A1_0 = 3, A1_1 = 4, A1_2 = 5
+ *
+ * For 2 timers
+ * A0_0 +           A0_1 +          A0_2 +          A1_0 +          A1_1 +
+ *      A0_1 = 10,      A0_2 = 15,      A1_0 = 19,      A1_1 = 22,      A1_2 = 24,
+ *      A0_2 = 11,      A1_0 = 16,      A1_1 = 20,      A1_2 = 23,
+ *      A1_0 = 12,      A1_1 = 17,      A1_2 = 21,
+ *      A1_1 = 13,      A1_2 = 18,
+ *      A1_2 = 14,
+ *
+ */
 
 //main function
 int main(void)
@@ -142,11 +154,11 @@ int main(void)
 	//button = 1;
 	//pot = 1;
 	//thermometer = 1;
-	led2_blink = 1;
-	blink_rate_3 = 32768;
+	//led2_blink = 1;
+	//blink_rate_3 = 32768;
 	//led3_blink = 1;
-	led3_rot = 1;
-	led3_dir = 1;
+	//led3_rot = 1;
+	//led3_dir = 1;
 	led1_breath = 1;
     //led1_fade_in = 1;
 	//led1_fade_out = 1;
@@ -594,8 +606,8 @@ __interrupt void Timer0_A0 (void)
         TA0CCR0 += blink_rate_1;
     }
 
-    //fading in, part 1,
-    if((led1_fade_in == 10) || (led1_fade_in == 11) || (led1_fade_in == 12) || (led1_fade_in == 13) || (led1_fade_in == 14)){
+    //fading in/out and breathing, part 1, can be 10, 11, 12, 13, 14
+    if(((led1_fade_in >= 10) && (led1_fade_in <= 14)) || ((led1_fade_out >= 10) && (led1_fade_out <= 14)) || ((led1_breath >= 10) && (led1_breath <= 14))){
         if(counter_val_1 < brightness_1){
             P1OUT |= BIT0;                              //Turn on light
         } else {
@@ -608,38 +620,6 @@ __interrupt void Timer0_A0 (void)
         }
         TA0CCR0 += change_period;
     }
-
-    //fading out, part 1,
-    if((led1_fade_out == 10) || (led1_fade_out == 11) || (led1_fade_out == 12) || (led1_fade_out == 13) || (led1_fade_out == 14)){
-        if(counter_val_1 < brightness_1){
-             P1OUT |= BIT0;                              //Turn on light
-        } else {
-            P1OUT &= ~BIT0;
-        }
-        counter_val_1 += 1;                             //Increment the value to read from the array
-
-        if(counter_val_1 >= max_brightness){                       //reached max value, reset
-            counter_val_1 = 0;
-        }
-        TA0CCR0 += change_period;
-    }
-
-    //breathing light, part 1
-    if((led1_breath == 10) || (led1_breath == 11) || (led1_breath == 12) || (led1_breath == 13) || (led1_breath == 14)){
-        if(counter_val_1 < brightness_1){
-            P1OUT |= BIT0;                              //Turn on light
-        } else {
-            P1OUT &= ~BIT0;
-        }
-        counter_val_1 += 1;                             //Increment the value to read from the array
-
-        if(counter_val_1 >= max_brightness){                       //reached max value, reset
-            counter_val_1 = 0;
-        }
-        TA0CCR0 += change_period;
-    }
-
-
 
     //LED2 blinking
     if(led2_blink == 0){
@@ -745,8 +725,8 @@ __interrupt void Timer0_A1(void){
             TA0CCR1 += blink_rate_1;
         }
 
-        //fading in, part 1
-        if((led1_fade_in == 15) || (led1_fade_in == 16) || (led1_fade_in == 17) || (led1_fade_in == 18)){
+        //fading in/out and breathing, part 1, can be 15, 16, 17, or 18
+        if(((led1_fade_in >= 15) && (led1_fade_in <= 18)) || ((led1_fade_out >= 15) && (led1_fade_out <= 18)) || ((led1_breath >= 15) && (led1_breath <= 18))){
             if(counter_val_1 < brightness_1){
                 P1OUT |= BIT0;                              //Turn on light
             } else {
@@ -759,36 +739,6 @@ __interrupt void Timer0_A1(void){
             }
             TA0CCR1 += change_period;
         }
-        //fading out, part 1,
-        if((led1_fade_out == 15) || (led1_fade_out == 16) || (led1_fade_out == 17) || (led1_fade_out == 18)){
-            if(counter_val_1 < brightness_1){
-                 P1OUT |= BIT0;                              //Turn on light
-            } else {
-                P1OUT &= ~BIT0;
-            }
-            counter_val_1 += 1;                             //Increment the value to read from the array
-
-            if(counter_val_1 >= max_brightness){                       //reached max value, reset
-                counter_val_1 = 0;
-            }
-            TA0CCR1 += change_period;
-        }
-
-        //breathing light, part 1
-        if((led1_breath == 15) || (led1_breath == 16) || (led1_breath == 17) || (led1_breath == 18)){
-            if(counter_val_1 < brightness_1){
-                P1OUT |= BIT0;                              //Turn on light
-            } else {
-                P1OUT &= ~BIT0;
-            }
-            counter_val_1 += 1;                             //Increment the value to read from the array
-
-            if(counter_val_1 >= max_brightness){                       //reached max value, reset
-                counter_val_1 = 0;
-            }
-            TA0CCR1 += change_period;
-        }
-
 
         //fade in part 2
         if(led1_fade_in == 10) {
@@ -934,40 +884,8 @@ __interrupt void Timer0_A1(void){
             TA0CCR2 += blink_rate_1;
         }
 
-        //fading in, part 1
-        if((led1_fade_in == 19) || (led1_fade_in == 20) || (led1_fade_in == 21)){
-            if(counter_val_1 < brightness_1){
-                P1OUT |= BIT0;                              //Turn on light
-            } else {
-                P1OUT &= ~BIT0;
-            }
-            counter_val_1 += 1;                             //Increment the value to read from the array
-
-            if(counter_val_1 >= max_brightness){                       //reached max value, reset
-                counter_val_1 = 0;
-            }
-
-            TA0CCR2 += change_period;
-        }
-
-        //fading out, part 1
-        if((led1_fade_out == 19) || (led1_fade_out == 20) || (led1_fade_out == 21)){
-            if(counter_val_1 < brightness_1){
-                P1OUT |= BIT0;                              //Turn on light
-            } else {
-                P1OUT &= ~BIT0;
-            }
-            counter_val_1 += 1;                             //Increment the value to read from the array
-
-            if(counter_val_1 >= max_brightness){                       //reached max value, reset
-                counter_val_1 = 0;
-            }
-
-            TA0CCR2 += change_period;
-        }
-
-        //breathing light, part 1
-        if((led1_breath == 19) || (led1_breath == 20) || (led1_breath == 21)){
+        //fading in/out and breathing, part 1, can be 19, 20, or 21
+        if(((led1_fade_in >= 19) && (led1_fade_in <= 21)) || ((led1_fade_out >= 19) && (led1_fade_out <= 21)) || ((led1_breath >= 19) && (led1_breath <= 21))){
             if(counter_val_1 < brightness_1){
                 P1OUT |= BIT0;                              //Turn on light
             } else {
@@ -1134,39 +1052,9 @@ __interrupt void Timer1_A0 (void)
         P1OUT ^= BIT0;
         TA1CCR0 += blink_rate_1;
     }
-      //fading in, part 1
-    if((led1_fade_in == 22) || (led1_fade_in == 23)){
-        if(counter_val_1 < brightness_1){
-            P1OUT |= BIT0;                              //Turn on light
-        } else {
-            P1OUT &= ~BIT0;
-        }
-        counter_val_1 += 1;                             //Increment the value to read from the array
 
-        if(counter_val_1 >= max_brightness){                       //reached max value, reset
-            counter_val_1 = 0;
-        }
-        TA1CCR0 += change_period;
-    }
-
-    //fading out, part 1,
-    if((led1_fade_out == 22) || (led1_fade_out == 23)){
-        if(counter_val_1 < brightness_1){
-            P1OUT |= BIT0;                              //Turn on light
-        } else {
-            P1OUT &= ~BIT0;
-        }
-        counter_val_1 += 1;                             //Increment the value to read from the array
-
-        if(counter_val_1 >= max_brightness){                       //reached max value, reset
-            counter_val_1 = 0;
-        }
-
-        TA1CCR0 += change_period;
-    }
-
-    //breathing light, part 1
-    if((led1_breath == 22) || (led1_breath == 23)){
+    //fading in/out and breathing, part 1, can be 22 or 23
+    if(((led1_fade_in == 22) && (led1_fade_in == 23)) || ((led1_fade_out == 22) && (led1_fade_out == 23)) || ((led1_breath == 22) && (led1_breath == 23))){
         if(counter_val_1 < brightness_1){
             P1OUT |= BIT0;                              //Turn on light
         } else {
@@ -1312,8 +1200,8 @@ __interrupt void Timer1_A1(void){
             TACCR1 += blink_rate_1;
         }
 
-        //fading in, part 1
-        if((led1_fade_in == 24) ){
+        //fading in/out and breathing, part 1, can be 24
+        if((led1_fade_in == 22) || (led1_fade_out == 24) || (led1_breath == 24)){
             if(counter_val_1 < brightness_1){
                 P1OUT |= BIT0;                              //Turn on light
             } else {
@@ -1326,38 +1214,6 @@ __interrupt void Timer1_A1(void){
             }
             TA1CCR1 += change_period;
         }
-
-        //fading out, part 1,
-        if(led1_fade_out == 24){
-            if(counter_val_1 < brightness_1){
-                P1OUT |= BIT0;                              //Turn on light
-            } else {
-                P1OUT &= ~BIT0;
-            }
-            counter_val_1 += 1;                             //Increment the value to read from the array
-
-            if(counter_val_1 >= max_brightness){                       //reached max value, reset
-                counter_val_1 = 0;
-            }
-
-            TA1CCR1 += change_period;
-        }
-
-        //breathing light, part 1
-        if(led1_breath == 24){
-            if(counter_val_1 < brightness_1){
-                P1OUT |= BIT0;                              //Turn on light
-            } else {
-                P1OUT &= ~BIT0;
-            }
-            counter_val_1 += 1;                             //Increment the value to read from the array
-
-            if(counter_val_1 >= max_brightness){                       //reached max value, reset
-                counter_val_1 = 0;
-            }
-            TA1CCR1 += change_period;
-        }
-
 
         //fade in part 2
         if((led1_fade_in == 13) || (led1_fade_in == 17) || (led1_fade_in == 20) || (led1_fade_in == 22)) {
