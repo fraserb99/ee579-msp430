@@ -8,8 +8,10 @@
  * based on previous challenges and examples from TI code
  */
 
+//Global variables and constants
+//inputs
 //button stuff
-signed int button = -1;                         //Button boolean, for use
+signed int button = -1;                         //Button variable, depends on timer used
 unsigned int b_activated = 0;                   //boolean for denoting button activation
 unsigned int timerCount = 0;                    //initial count for the wait time
 unsigned int pressed = 0;                       //checking for pressed state, used for debouncing
@@ -17,6 +19,16 @@ unsigned int held = 0;                          //checking if the button is bein
 const int debounce_b = 328;                     //count for the 50Hz, based on 32768/(2*x)= 50, want a 20ms wait for the debouncing, 1/20*10^-3 = 50
 const int count_b = 820;                        //count for the count for presses, rate of 20Hz, based on 32768/(2x) = 20Hz
 int activated_button[];                         //indicator for activated timer for the button
+
+//Button 2 (called switch
+signed int button2 = -1;                        //Button 2 variable
+unsigned int b2_activated = 0;                  //button 2 activation
+unsigned int timerCount2 = 0;                   //initial count for the wait time
+unsigned int pressed2 = 0;                      //checking for pressed state, used for debouncing
+unsigned int held2 = 0;                         //checking if the button is being pressed/held
+const int debounce_b2 = 164;                    //count for the 100Hz, based on 32768/(2*x)= 100, want a 10ms wait for the debouncing, 1/20*10^-3 = 50
+const int count_b2 = 820;                       //count for the count for presses, rate of 20Hz, based on 32768/(2x) = 20Hz
+int activated_button2[];                        //indicator for activated timer for the button
 
 //potentiometer stuff
 unsigned int pot = 0;                           //Potentiometer use
@@ -39,11 +51,7 @@ unsigned int sample_temp = 0;                   //boolean to be used to indicate
 const int sample_temp_time = 16384;             //used for sample time of the temperature 16384
 int activated_temp[];                           //indicator for activated timer for the temperature
 
-//switches
-unsigned int switch1 = 0;                       //switch 1
-unsigned int sw1_activated = 0;                 //boolean for denoting switch 1 activation
-const int debounce_s = 328;                     //setting for the 50Hz, based on 32768/(2*x)= 50, want a 20ms wait for the debouncing, 1/20*10^-3 = 50
-
+//Outputs
 //constants for breathing and fading lights, same for all LEDs independent of user defined speeds
 const int max_brightness = 32;                  //used for checking max value for brightness and counter value
 const int change_period = 16;                   //period for flashing and breathing, default values
@@ -146,24 +154,27 @@ int get_timer_code(int timers[]);                               //get the specif
 
 //main function
 int main(void)
-{
+ {
 	WDTCTL = WDTPW | WDTHOLD;	// stop watchdog timer
 
 	//stuff for testing
-	//P1DIR |= BIT0 + BIT6;      // P1.0, P1.6 output
+	P1DIR |= BIT0 + BIT6;      // P1.0, P1.6 output
 	//P2DIR |= BIT1;             //utilise D3
-	button = 1;
+	//button = 1;
+	button2 = 1;
 	//pot = 1;
 	//thermometer = 1;
 	//led1_blink = 1;
 	//blink_rate_3 = 32768;
 	//led3_on = 1;
-	//led3_blink = 1;
+	//led1_blink = 1;
 	//led3_rot = 1;
 	//led3_dir = 1;
-	led3_breath = 1;
-    //led3_fade_in = 1;
+	//led1_breath = 1;
+    //led1_fade_in = 1;
 	//led3_fade_out = 1;
+
+
 
 	__bis_SR_register(GIE);                     //interrupt enabled
 
@@ -197,7 +208,38 @@ int main(void)
             b_activated = 0;                        //if button is no longer requested
             deactivate_timer(activated_button, 2);   //turn off timer
             P1IE &= ~BIT3;                          //and button interrupt
+            P1REN |= BIT3;                          // and dissable the pullup/pulldown
             button = -1;
+        }
+
+
+        //check button 2, same code as button 1 pretty much, just different pins
+        //Copied from button 1
+        if (button2 > -1){
+            if (!b2_activated){ //if not already activated
+                P1OUT |= BIT5;                            //pull up resistor on P1.5
+                P1REN |= BIT5;                            //Enable it
+                P1IES |= BIT5;                            //high to low edge
+                P1IFG &= ~BIT5;                           // Clear flag
+                P1IE |= BIT5;                             //Interrupt enable
+
+                int counts[1] = {debounce_b2};
+                b2_activated = activate_free_timer(1, counts);
+                //record which ones were activated
+                activated_button2[0] = activated_timers[0];
+                button2 = activated_button2[0];                //assign to check properly for timer interrupts
+                if (b2_activated != 1) { //if return is 1, has now been activated
+                    //something went wrong
+                    //for testing
+                    P1OUT ^= BIT6;
+                }
+            }
+        } else if(button2 == -2){
+            b2_activated = 0;                        //if button is no longer requested
+            deactivate_timer(activated_button2, 2);   //turn off timer
+            P1IE &= ~BIT5;                          //and button interrupt
+            P1REN |= BIT5;                          // and dissable the pullup/pulldown
+            button2 = -1;
         }
 
         //need checks to see if potentiometer was requested
@@ -305,16 +347,6 @@ int main(void)
             thermometer = -1;
         }
 
-        //check switch 1
-        if(switch1){
-            if(!sw1_activated){
-
-                sw1_activated = 1;
-            }
-        } else {
-            sw1_activated = 0;
-        }
-
 
         //Outputs
         //LED1
@@ -380,8 +412,7 @@ int main(void)
             }
 
         } else if (led1_fade_in == -2){
-            led1_active = 0;
-            //P1OUT &= ~BIT0; want the light on
+            //led1_active = 0; - light is still active
             deactivate_timer(activated_led1, 2);
             led1_fade_in = -1;
         }
@@ -501,7 +532,7 @@ int main(void)
             }
 
         } else if (led2_fade_in == -2){
-            led2_active = 0;
+            //led2_active = 0; - light is still active
             //P1OUT &= ~BIT6;
             deactivate_timer(activated_led2, 2);
             led2_fade_in = -1;
@@ -647,7 +678,7 @@ int main(void)
             }
 
         } else if (led3_fade_in == -2){
-            led3_active = 0;
+            //led3_active = 0;
             //P2OUT &= ~(BIT1 + BIT3 + BIT5);
             deactivate_timer(activated_led3, 2);
             led3_fade_in = -1;
@@ -743,6 +774,36 @@ __interrupt void Timer0_A0 (void)
 
         } else {
             pressed = 0;                         //Button is not being pressed
+        }
+
+     }
+
+    //button 2, copied code
+    if ((button2 == 0) && (held2 == 1)) {
+        if ((held2 == 1) && !(P1IN & BIT5)) { //check how long its being held for
+            timerCount2 += 1;
+
+        } else if ((held2 == 1) && (P1IN & BIT5)){   //if button was released
+            //send timer count signal here
+            //testing with light first
+            //P1OUT ^= BIT0;
+            held2 = 0;                               //button has now been released
+        }
+        //offset TA0CCR0 by the count number/period
+        TA0CCR0 += count_b2;
+    } else if (button2 == 0){ //check that it is the button debouncing
+        if ((pressed2 == 1) && !(P1IN & BIT5)){   //button was pressed properly
+             timerCount2 = 0;                     //Reset the timer count
+             pressed2 = 0;                        //reset pressed
+             held2 = 1;                           //Button is being held
+             //P1OUT ^= BIT6;
+             //offset TA0CCR0 by the count number/period
+             //change the value held in the array
+             timers_used[0] = count_b2;
+             TA0CCR0 += count_b2;
+
+        } else {
+            pressed2 = 0;                         //Button is not being pressed
         }
 
      }
@@ -878,7 +939,7 @@ __interrupt void Timer0_A1(void){
                // P1OUT ^= BIT0;
                 held = 0;                               //button has now been released
             }
-            //offset TA0CCR0 by the count number/period
+            //offset TA0CCR1 by the count number/period
             TA0CCR1 += count_b;
         } else if (button == 1){ //check that it is the button debouncing
             if ((pressed == 1) && !(P1IN & BIT3)){   //button was pressed properly
@@ -893,6 +954,36 @@ __interrupt void Timer0_A1(void){
 
             } else {
                 pressed = 0;                         //Button is not being pressed
+            }
+
+         }
+
+        //button 2, copied code
+        if ((button2 == 1) && (held2 == 1)) {
+            if ((held2 == 1) && !(P1IN & BIT5)) { //check how long its being held for
+                timerCount2 += 1;
+
+            } else if ((held2 == 1) && (P1IN & BIT5)){   //if button was released
+                //send timer count signal here
+                //testing with light first
+                P1OUT ^= BIT0;
+                held2 = 0;                               //button has now been released
+            }
+            //offset TA0CCR1 by the count number/period
+            TA0CCR1 += count_b2;
+        } else if (button2 == 1){ //check that it is the button debouncing
+            if ((pressed2 == 1) && !(P1IN & BIT5)){   //button was pressed properly
+                 timerCount2 = 0;                     //Reset the timer count
+                 pressed2 = 0;                        //reset pressed
+                 held2 = 1;                           //Button is being held
+                 P1OUT ^= BIT0;
+                 //offset TA0CCR0 by the count number/period
+                 //change the value held in the array
+                 timers_used[0] = count_b2;
+                 TA0CCR1 += count_b2;
+
+            } else {
+                pressed2 = 0;                         //Button is not being pressed
             }
 
          }
@@ -945,7 +1036,7 @@ __interrupt void Timer0_A1(void){
 
             if(brightness_1 == max_brightness){               //if max brightness
                 P1OUT |= BIT0;             //leave it on
-                led1_fade_in = -1;          //completed task
+                led1_fade_in = -2;          //completed task
             }
 
             TA0CCR1 += period_1;
@@ -1180,6 +1271,34 @@ __interrupt void Timer0_A1(void){
 
             } else {
                 pressed = 0;                         //Button is not being pressed
+            }
+
+         }
+
+        //button 2, copied code
+        if ((button2 == 2) && (held2 == 1)) {
+            if ((held2 == 1) && !(P1IN & BIT5)) { //check how long its being held for
+                timerCount2 += 1;
+
+            } else if ((held2 == 1) && (P1IN & BIT5)){   //if button was released
+                //send timer count signal here
+
+                held2 = 0;                               //button has now been released
+            }
+            //offset TA0CCR0 by the count number/period
+            TA0CCR2 += count_b2;
+        } else if (button2 == 2){ //check that it is the button debouncing
+            if ((pressed2 == 1) && !(P1IN & BIT5)){   //button was pressed properly
+                 timerCount2 = 0;                     //Reset the timer count
+                 pressed2 = 0;                        //reset pressed
+                 held2 = 1;                           //Button is being held
+
+                 //change the value held in the array
+                 timers_used[0] = count_b2;
+                 TA0CCR2 += count_b2;
+
+            } else {
+                pressed2 = 0;                         //Button is not being pressed
             }
 
          }
@@ -1482,6 +1601,33 @@ __interrupt void Timer1_A0 (void)
 
      }
 
+    //button 2, copied code
+    if ((button2 == 3) && (held2 == 1)) {
+        if ((held2 == 1) && !(P1IN & BIT5)) { //check how long its being held for
+            timerCount2 += 1;
+
+        } else if ((held2 == 1) && (P1IN & BIT5)){   //if button was released
+            //send timer count signal here
+
+            held2 = 0;                               //button has now been released
+        }
+        //offset TA0CCR0 by the count number/period
+        TA1CCR0 += count_b2;
+    } else if (button2 == 3){ //check that it is the button debouncing
+        if ((pressed2 == 1) && !(P1IN & BIT5)){   //button was pressed properly
+             timerCount2 = 0;                     //Reset the timer count
+             pressed2 = 0;                        //reset pressed
+             held2 = 1;                           //Button is being held
+             //change the value held in the array
+             timers_used[0] = count_b2;
+             TA1CCR0 += count_b2;
+
+        } else {
+            pressed2 = 0;                         //Button is not being pressed
+        }
+
+     }
+
 
     //thermometer stuff
     if(thermometer == 3){
@@ -1774,6 +1920,32 @@ __interrupt void Timer1_A1(void){
 
          }
 
+        //button 2, copied code
+        if ((button2 == 4) && (held2 == 1)) {
+            if ((held2 == 1) && !(P1IN & BIT5)) { //check how long its being held for
+                timerCount2 += 1;
+
+            } else if ((held2 == 1) && (P1IN & BIT5)){   //if button was released
+                //send timer count signal here
+                held2 = 0;                               //button has now been released
+            }
+            //offset TA0CCR0 by the count number/period
+            TA1CCR1 += count_b2;
+        } else if (button2 == 4){ //check that it is the button debouncing
+            if ((pressed2 == 1) && !(P1IN & BIT5)){   //button was pressed properly
+                 timerCount2 = 0;                     //Reset the timer count
+                 pressed2 = 0;                        //reset pressed
+                 held2 = 1;                           //Button is being held
+                 //change the value held in the array
+                 timers_used[0] = count_b2;
+                 TA1CCR1 += count_b2;
+
+            } else {
+                pressed2 = 0;                         //Button is not being pressed
+            }
+
+         }
+
         //outputs
         //LED1 blinking
         if(led1_blink == 4){
@@ -2042,6 +2214,35 @@ __interrupt void Timer1_A1(void){
             }
 
          }
+
+        //button 2, copied code
+        if ((button2 == 5) && (held2 == 1)) {
+            if ((held2 == 1) && !(P1IN & BIT5)) { //check how long its being held for
+                timerCount2 += 1;
+
+            } else if ((held2 == 1) && (P1IN & BIT5)){   //if button was released
+                //send timer count signal here
+
+                held2 = 0;                               //button has now been released
+            }
+            //offset TA0CCR0 by the count number/period
+            TA1CCR2 += count_b2;
+        } else if (button2 == 5){ //check that it is the button debouncing
+            if ((pressed2 == 1) && !(P1IN & BIT5)){   //button was pressed properly
+                 timerCount2 = 0;                     //Reset the timer count
+                 pressed2 = 0;                        //reset pressed
+                 held2 = 1;                           //Button is being held
+
+                 //change the value held in the array
+                 timers_used[0] = count_b2;
+                 TACCR2 += count_b2;
+
+            } else {
+                pressed2 = 0;                         //Button is not being pressed
+            }
+
+         }
+
         //thermometer stuff
         if(thermometer == 5){
             if (!stable){
@@ -2286,6 +2487,30 @@ __interrupt void Port_1(void){
         }
 
         P1IFG &= ~BIT3;                             //clear flag
+    } else if(P1IFG & BIT5){ //if it was button 2
+        pressed2 = 1;
+        //debouncer timer, based on current count, check which one was used
+        switch(button2){
+        case 0:
+            TA0CCR0 = TAR + debounce_b2;         //Current count plus the wanted debounce part
+            break;
+        case 1:
+            TA0CCR1 = TAR + debounce_b2;
+            break;
+        case 2:
+            TA0CCR2 = TAR + debounce_b2;
+            break;
+        case 3:
+            TA1CCR0 = TAR + debounce_b2;
+            break;
+        case 4:
+            TA1CCR1 = TAR + debounce_b2;
+            break;
+        case 5:
+            TA1CCR2 = TAR + debounce_b2;
+            break;
+        }
+        P1IFG &= ~BIT5;                             //clear flag
     }
 
 
@@ -2342,7 +2567,7 @@ int activate_free_timer(int registers, int counts[]){
     unsigned int index = 0;
     unsigned int i;
     for(i=0; i < 6; i++){
-       if((timers_used[i] == 0) || (timers_used[i] == counts[index])){
+       if((timers_used[i] == 0)){
            free[index] = i;
            index++;
        }
