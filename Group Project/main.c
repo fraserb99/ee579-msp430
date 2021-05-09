@@ -797,7 +797,7 @@ __interrupt void Timer0_A0 (void)
              pressed2 = 0;                        //reset pressed
              held2 = 1;                           //Button is being held
              //P1OUT ^= BIT6;
-             //offset TA0CCR0 by the count number/period
+
              //change the value held in the array
              timers_used[0] = count_b2;
              TA0CCR0 += count_b2;
