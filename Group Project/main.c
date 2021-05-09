@@ -57,7 +57,7 @@ const int max_brightness = 32;                  //used for checking max value fo
 const int change_period = 16;                   //period for flashing and breathing, default values
 const int brightness_register_1 = 4096;         //used for brightness increment timing, 1Hz, first setting
 const int brightness_register_2 = 2048;         //used for brightness increment timing, 2Hz, second setting
-const int brightness_register_3 = 2048;         //used for brightness increment timing, 4Hz, third setting
+const int brightness_register_3 = 1024;         //used for brightness increment timing, 4Hz, third setting
 //LED1 stuff
 signed int led1_on = 0;                         //LED D1 on, 0 indicate off, -1 - deactivate
 unsigned int led1_active = 0;                   //check if the light has been activated - can only have one setting on at a time
@@ -86,7 +86,7 @@ unsigned int light_flag_2 = 0;                  //breathing and fading light fla
 unsigned int brightness_2 = 0;                  //varies brightness between 0 and 32
 unsigned int counter_val_2 = 0;                 //LED counter
 unsigned int period_2 = 2048;                   //period for flashing and breathing, default
-int activated_led2[0];                          //Array for activated timers for LED D2
+int activated_led2[];                          //Array for activated timers for LED D2
 
 //LED3 stuff
 signed int led3_on = 0;                         //LED D3 on/off, colour light
@@ -118,8 +118,15 @@ unsigned int period_3 = 2048;                    //period for flashing and breat
 int activated_led3[];                           //Array for activated timers for the colour led
 
 //buzzer stuff
-unsigned int buzzer_sus = 0;                    //buzzer sustained tone
-unsigned int buzzer_beep = 0;                   //buzzer beeping
+signed int buzzer_tone = 0;                  //buzzer on, for specific period
+signed int buzzer_beep = 0;                     //buzzer beeping
+unsigned int buzzer_active = 0;                 //boolean for indicating that the buzzer has been activated/is being used
+unsigned int buzzer_on = 0;                     //boolean used for indicating if the buzzer is on during the beep one
+unsigned int buzzer_duration = 2000;            //buzzer duration, in ms, will be divided to closest 100ms, 2000 is default
+unsigned int buzzer_duration_off = 1000;        //second buzzer duration for the beeping, off period, to nearest 100ms, 1000 is default
+unsigned int buzzer_count = 0;                  //counter variable for the on period of the buzzer
+const int buzzer_period = 82;                 //timer for counting the required on period, 50ms = 20Hz
+int activated_buzzer[];                         //Array for activated timer for the buzzer
 
 //array for timer usage, 0 if not used, 1 if used 0, pos 0:TA0_0, 1:TA0_1, 2:TA0_2, 3:TA1_0, 4: TA1_1, 5:TA1_2
 unsigned int timers_used[6] = {0, 0, 0, 0, 0, 0};
@@ -138,7 +145,7 @@ void deactivate_timer(int activated[], int len);                //deactivate unu
 int get_timer_code(int timers[]);                               //get the specific timer code for 2 timers
 
 
-/* Description of codes used for the LEDs:
+/* Description of codes used for the timers:
  * for those with 1 timer:
  * A0_0 = 0, A0_1 = 1, A0_2 = 2, A1_0 = 3, A1_1 = 4, A1_2 = 5
  *
@@ -150,6 +157,8 @@ int get_timer_code(int timers[]);                               //get the specif
  *      A1_1 = 13,      A1_2 = 18,
  *      A1_2 = 14,
  *
+ * -2 indicate disable/turn off, -1 is the equivalent of off
+ *
  */
 
 //main function
@@ -158,10 +167,10 @@ int main(void)
 	WDTCTL = WDTPW | WDTHOLD;	// stop watchdog timer
 
 	//stuff for testing
-	P1DIR |= BIT0 + BIT6;      // P1.0, P1.6 output
+	//P1DIR |= BIT0 + BIT6;      // P1.0, P1.6 output
 	//P2DIR |= BIT1;             //utilise D3
-	//button = 1;
-	button2 = 1;
+	button = 1;
+	//button2 = 1;
 	//pot = 1;
 	//thermometer = 1;
 	//led1_blink = 1;
@@ -173,6 +182,7 @@ int main(void)
 	//led1_breath = 1;
     //led1_fade_in = 1;
 	//led3_fade_out = 1;
+	buzzer_beep = 1;
 
 
 
@@ -733,13 +743,66 @@ int main(void)
 
         } else if (led3_breath == -2){
             led3_active = 0;
-            P2DIR &= ~(BIT1 + BIT3 + BIT5);
+            P2OUT &= ~(BIT1 + BIT3 + BIT5); //turn off the light
             deactivate_timer(activated_led3, 2);
             led3_breath = -1;
         }
+
+        //Buzzer for specified duration
+        if(buzzer_tone > -1){
+            if(!buzzer_active){ //if it's not been activated
+                //activate the pins used
+                P2DIR |= BIT2 + BIT4;
+                P2OUT |= BIT2;     //ensure one is on, the other off
+                P2OUT &= ~ BIT4;
+                buzzer_count = 0;   //ensure this is at 0;
+                buzzer_duration = buzzer_duration/5; //ensure duration is proper
+                //need to have 1 timer
+                int counts[1] = {buzzer_period};
+                buzzer_active = activate_free_timer(1, counts);
+                activated_buzzer[0] = activated_timers[0]; //record which one were activated
+                buzzer_tone = activated_buzzer[0]; //get the timer
+                if (buzzer_active == 0) { //if return is anything but 0, has now been activated
+                    //something went wrong
+                }
+            }
+        } else if (buzzer_tone == -2){
+            buzzer_active = 0;  //no longer on
+            P2OUT &= ~BIT2;
+            P2OUT &= ~BIT4;
+            deactivate_timer(activated_buzzer, 1);
+            buzzer_tone = -1;
+        }
+
+        //Buzzer beeping
+        if(buzzer_beep > -1){
+            if(!buzzer_active){ //if it's not been activated
+                //activate the pins used
+                P2DIR |= BIT2 + BIT4;
+                P2OUT |= BIT2;     //ensure one is on, the other off
+                P2OUT &= ~ BIT4;
+                buzzer_count = 0;   //ensure this is at 0;
+                buzzer_duration = 400; //ensure duration is proper
+                buzzer_duration_off = buzzer_duration_off/5; //ensure duration is proper
+                //need to have 1 timer
+                int counts[1] = {buzzer_period};
+                buzzer_active = activate_free_timer(1, counts);
+                activated_buzzer[0] = activated_timers[0]; //record which one were activated
+                buzzer_beep = activated_buzzer[0];
+                if (buzzer_active == 0) { //if return is anything but 0, has now been activated
+                    //something went wrong
+                }
+            }
+
+        } else if (buzzer_beep == -2){
+            buzzer_active = 0;  //no longer on
+            P2OUT &= ~BIT2;
+            P2OUT &= ~BIT4;
+            deactivate_timer(activated_buzzer, 1);
+            buzzer_beep= -1;
+        }
+
     }
-
-
 }
 
 //interrupts, duplicated code to allow for the optimum timer usage
@@ -757,6 +820,7 @@ __interrupt void Timer0_A0 (void)
             //led1_fade_out = 1;
             //testing with light first
             //P1OUT ^= BIT6;
+            buzzer_beep = -2;
             held = 0;                               //button has now been released
         }
         //offset TA0CCR0 by the count number/period
@@ -918,6 +982,54 @@ __interrupt void Timer0_A0 (void)
             counter_val_3 = 0;
         }
         TA0CCR0 += change_period;
+    }
+
+    //Buzzer, tone for specific duration
+    if(buzzer_tone == 0){
+        buzzer_count += 1;  //increment count
+        //alternate the pins
+        P2OUT ^= BIT2;
+        P2OUT ^= BIT4;
+
+        //check if less or greater than the wanted duration
+        if(buzzer_count >= buzzer_duration){
+            buzzer_tone = -2; //turn it off
+        }
+
+        TA0CCR0 += buzzer_period;
+    }
+
+    //buzzer beeping
+    if(buzzer_beep == 0){
+        buzzer_count += 1;  //increment count
+
+        if(buzzer_on) { //if it is on, alternate
+            //alternate the pins
+            P2OUT ^= BIT2;
+            P2OUT ^= BIT4;
+            //check if less or greater than the wanted duration
+            if(buzzer_count >= buzzer_duration){
+                buzzer_on = 0; //turn off
+                buzzer_count = 0; //reset count
+            }
+
+        } else { //if off, turn both off
+            P2OUT &= ~BIT2;
+            P2OUT &= ~BIT4;
+
+            //check if less or greater than the wanted duration
+            if(buzzer_count >= buzzer_duration_off){
+                buzzer_on= 1; //turn it on
+                //buzzer count reset
+                buzzer_count = 0;
+                //turn one of them on
+                P2OUT |= BIT2;
+            }
+
+        }
+
+
+        TA0CCR0 += buzzer_period;
     }
 }
 
@@ -1242,6 +1354,55 @@ __interrupt void Timer0_A1(void){
 
             TA0CCR1 += period_3;
         }
+
+        //Buzzer tone
+        if(buzzer_tone == 1){
+            buzzer_count += 1;  //increment count
+            //alternate the pins
+            P2OUT ^= BIT2;
+            P2OUT ^= BIT4;
+
+            //check if less or greater than the wanted duration
+            if(buzzer_count >= buzzer_duration){
+                buzzer_tone = -2; //turn it off
+            }
+
+            TA0CCR1 += buzzer_period;
+        }
+
+        //buzzer beeping
+        if(buzzer_beep == 1){
+            buzzer_count += 1;  //increment count
+
+            if(buzzer_on) { //if it is on, alternate
+                //alternate the pins
+                P2OUT ^= BIT2;
+                P2OUT ^= BIT4;
+                //check if less or greater than the wanted duration
+                if(buzzer_count >= buzzer_duration){
+                    buzzer_on = 0; //turn off
+                    buzzer_count = 0; //reset count
+                }
+
+            } else { //if off, turn both off
+                P2OUT &= ~BIT2;
+                P2OUT &= ~BIT4;
+
+                //check if less or greater than the wanted duration
+                if(buzzer_count >= buzzer_duration_off){
+                    buzzer_on= 1; //turn it on
+                    //buzzer count reset
+                    buzzer_count = 0;
+                    //turn one of them on
+                    P2OUT |= BIT2;
+                }
+
+            }
+
+
+            TA0CCR1 += buzzer_period;
+        }
+
         break;
     case 4:
         //check for how long button was pressed
@@ -1557,6 +1718,55 @@ __interrupt void Timer0_A1(void){
 
             TA0CCR2 += period_2;
         }
+
+        //buzzer
+        if(buzzer_tone == 2){
+            buzzer_count += 1;  //increment count
+            //alternate the pins
+            P2OUT ^= BIT2;
+            P2OUT ^= BIT4;
+
+            //check if less or greater than the wanted duration
+            if(buzzer_count >= buzzer_duration){
+                buzzer_tone = -2; //turn it off
+            }
+
+            TA0CCR2 += buzzer_period;
+        }
+
+        //buzzer beeping
+        if(buzzer_beep == 2){
+            buzzer_count += 1;  //increment count
+
+            if(buzzer_on) { //if it is on, alternate
+                //alternate the pins
+                P2OUT ^= BIT2;
+                P2OUT ^= BIT4;
+                //check if less or greater than the wanted duration
+                if(buzzer_count >= buzzer_duration){
+                    buzzer_on = 0; //turn off
+                    buzzer_count = 0; //reset count
+                }
+
+            } else { //if off, turn both off
+                P2OUT &= ~BIT2;
+                P2OUT &= ~BIT4;
+
+                //check if less or greater than the wanted duration
+                if(buzzer_count >= buzzer_duration_off){
+                    buzzer_on= 1; //turn it on
+                    //buzzer count reset
+                    buzzer_count = 0;
+                    //turn one of them on
+                    P2OUT |= BIT2;
+                }
+
+            }
+
+
+            TA0CCR2 += buzzer_period;
+        }
+
         break;
 
     case 10: break;                             //Timer_A3 overflow, don't need to do anything
@@ -1881,6 +2091,53 @@ __interrupt void Timer1_A0 (void)
 
         TA1CCR0 += period_3;
     }
+
+    if(buzzer_tone == 3){
+        buzzer_count += 1;  //increment count
+        //alternate the pins
+        P2OUT ^= BIT2;
+        P2OUT ^= BIT4;
+
+        //check if less or greater than the wanted duration
+        if(buzzer_count >= buzzer_duration){
+            buzzer_tone = -2; //turn it off
+        }
+
+        TA1CCR0 += buzzer_period;
+    }
+
+    //buzzer beeping
+    if(buzzer_beep == 3){
+        buzzer_count += 1;  //increment count
+
+        if(buzzer_on) { //if it is on, alternate
+            //alternate the pins
+            P2OUT ^= BIT2;
+            P2OUT ^= BIT4;
+            //check if less or greater than the wanted duration
+            if(buzzer_count >= buzzer_duration){
+                buzzer_on = 0; //turn off
+                buzzer_count = 0; //reset count
+            }
+
+        } else { //if off, turn both off
+            P2OUT &= ~BIT2;
+            P2OUT &= ~BIT4;
+
+            //check if less or greater than the wanted duration
+            if(buzzer_count >= buzzer_duration_off){
+                buzzer_on= 1; //turn it on
+                //buzzer count reset
+                buzzer_count = 0;
+                //turn one of them on
+                P2OUT |= BIT2;
+            }
+
+        }
+
+
+        TA1CCR0 += buzzer_period;
+    }
 }
 
 //interrupt for timerA1
@@ -2182,6 +2439,55 @@ __interrupt void Timer1_A1(void){
 
             TA1CCR1 += period_3;
         }
+
+        //buzzer
+        if(buzzer_tone == 4){
+            buzzer_count += 1;  //increment count
+            //alternate the pins
+            P2OUT ^= BIT2;
+            P2OUT ^= BIT4;
+
+            //check if less or greater than the wanted duration
+            if(buzzer_count >= buzzer_duration){
+                buzzer_tone = -2; //turn it off
+            }
+
+            TA1CCR1 += buzzer_period;
+        }
+
+        //buzzer beeping
+        if(buzzer_beep == 4){
+            buzzer_count += 1;  //increment count
+
+            if(buzzer_on) { //if it is on, alternate
+                //alternate the pins
+                P2OUT ^= BIT2;
+                P2OUT ^= BIT4;
+                //check if less or greater than the wanted duration
+                if(buzzer_count >= buzzer_duration){
+                    buzzer_on = 0; //turn off
+                    buzzer_count = 0; //reset count
+                }
+
+            } else { //if off, turn both off
+                P2OUT &= ~BIT2;
+                P2OUT &= ~BIT4;
+
+                //check if less or greater than the wanted duration
+                if(buzzer_count >= buzzer_duration_off){
+                    buzzer_on= 1; //turn it on
+                    //buzzer count reset
+                    buzzer_count = 0;
+                    //turn one of them on
+                    P2OUT |= BIT2;
+                }
+
+            }
+
+
+            TA1CCR1 += buzzer_period;
+        }
+
         break;
     case 4:
         //check for how long button was pressed
@@ -2448,6 +2754,54 @@ __interrupt void Timer1_A1(void){
             }
 
             TA1CCR2 += period_3;
+        }
+
+        //buzzer
+        if(buzzer_tone == 5){
+            buzzer_count += 1;  //increment count
+            //alternate the pins
+            P2OUT ^= BIT2;
+            P2OUT ^= BIT4;
+
+            //check if less or greater than the wanted duration
+            if(buzzer_count >= buzzer_duration){
+                buzzer_tone = -2; //turn it off
+            }
+
+            TA1CCR2 += buzzer_period;
+        }
+
+        //buzzer beeping
+        if(buzzer_beep == 5){
+            buzzer_count += 1;  //increment count
+
+            if(buzzer_on) { //if it is on, alternate
+                //alternate the pins
+                P2OUT ^= BIT2;
+                P2OUT ^= BIT4;
+                //check if less or greater than the wanted duration
+                if(buzzer_count >= buzzer_duration){
+                    buzzer_on = 0; //turn off
+                    buzzer_count = 0; //reset count
+                }
+
+            } else { //if off, turn both off
+                P2OUT &= ~BIT2;
+                P2OUT &= ~BIT4;
+
+                //check if less or greater than the wanted duration
+                if(buzzer_count >= buzzer_duration_off){
+                    buzzer_on= 1; //turn it on
+                    //buzzer count reset
+                    buzzer_count = 0;
+                    //turn one of them on
+                    P2OUT |= BIT2;
+                }
+
+            }
+
+
+            TA1CCR2 += buzzer_period;
         }
         break;
 
