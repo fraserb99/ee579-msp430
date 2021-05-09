@@ -24,7 +24,7 @@ unsigned int pot_activated = 0;                 //boolean for denoting potentiom
 unsigned int orig_val = 0;                      //Setting up value for original potentiometer vale
 unsigned int value = 0;                         //value on check
 signed int change = 0;                          //value to check how much the pot has changed
-const int step_size = 10;                       //value to indicate step size
+const int step_size = 100;                       //value to indicate step size
 
 //temp stuff
 signed int thermometer = -1;                    //thermometer use
@@ -33,7 +33,7 @@ signed int orig_temp = 0;                       //Setting up value for original 
 signed int value_temp = 0;                      //value on check
 unsigned int temp = 0;
 signed long change_t = 0;                       //value to check how much the pot has changed
-const int step_size_t = 5;                      //value to indicate step size
+const int step_size_t = 2;                      //value to indicate step size, as error is +- 2 step size is set to 2 for more stable operation
 unsigned int stable = 0;                        //boolean for determining if stable Vref
 unsigned int sample_temp = 0;                   //boolean to be used to indicate a sample should be taken
 const int sample_temp_time = 16384;             //used for sample time of the temperature 16384
@@ -72,7 +72,7 @@ unsigned int led2_fo_active = 0;                //own activation check for fade 
 signed int led2_blink = -1;                     //LED2 blink
 signed int led2_fade_in = -1;                   //LED2 fade in
 signed int led2_fade_out = -1;                  //LED2 fade out
-signed int led2_breath = -1;                    //LED2 blinking light
+signed int led2_breath = -1;                    //LED2 breathing light
 unsigned int blink_rate_2 = 16384;              //rate for the blinking light of LED D2, default period 1Hz
 unsigned int light_flag_2 = 0;                  //breathing and fading light flag, brighter or darker,  brighter = 0, darker = 1;
 unsigned int brightness_2 = 0;                  //varies brightness between 0 and 32
@@ -81,8 +81,9 @@ unsigned int period_2 = 2048;                   //period for flashing and breath
 int activated_led2[0];                          //Array for activated timers for LED D2
 
 //LED3 stuff
-signed int led3_on = 0;                         //LED D3 on, colour light
+signed int led3_on = 0;                         //LED D3 on/off, colour light
 unsigned int led3_active = 0;                   //LED3 active
+unsigned int led3_fo_active = 0;                //own activation check for fade out as that can turn lights of that are on, if wanted
 signed int led3_rot = -1;                       //rotate led3
 signed int led3_dir = 0;                        //LED3 direction of rotation, -1 for backwards and 1 for forwards
 signed int led3_blink = -1;                     //LE3 blink
@@ -104,8 +105,8 @@ unsigned int blink_rate_3 = 16384;              //rate for the blinking light fo
 signed int light_flag_3 = 0;                    //breathing and fading light flag, brighter or darker,  brighter = 1, darker = -1;
 signed int brightness_3 = 0;                    //used for determining brightness, initially between 0 and 4
 unsigned int flash_count_3 = 0;                 //LED counter
-unsigned int duty_cycle_3 = 1;                  //duty cycle for breathing and flashing, default of 2048Hz
-unsigned int peroid_3 = 516;                    //period for flashing and breathing, default of 16Hz
+unsigned int counter_val_3 = 1;                  //duty cycle for breathing and flashing, default of 2048Hz
+unsigned int period_3 = 2048;                    //period for flashing and breathing, default of 16Hz
 int activated_led3[];                           //Array for activated timers for the colour led
 
 //buzzer stuff
@@ -151,17 +152,18 @@ int main(void)
 	//stuff for testing
 	//P1DIR |= BIT0 + BIT6;      // P1.0, P1.6 output
 	//P2DIR |= BIT1;             //utilise D3
-	//button = 1;
+	button = 1;
 	//pot = 1;
 	//thermometer = 1;
 	//led1_blink = 1;
 	//blink_rate_3 = 32768;
+	//led3_on = 1;
 	//led3_blink = 1;
 	//led3_rot = 1;
 	//led3_dir = 1;
-	led2_breath = 1;
-    //led2_fade_in = 1;
-	//led2_fade_out = 1;
+	led3_breath = 1;
+    //led3_fade_in = 1;
+	//led3_fade_out = 1;
 
 	__bis_SR_register(GIE);                     //interrupt enabled
 
@@ -202,8 +204,8 @@ int main(void)
         if (pot){
             if(!pot_activated){ //if not already activated
                 ADC10CTL0 = ADC10ON + CONSEQ_0;            // ADC10ON, single channel single sample
-                ADC10CTL1 = INCH_1 + ADC10SSEL_1;          // input A1, clock = ACLK
-                ADC10AE0 |= BIT1;                          // PA.1 ADC option select
+                ADC10CTL1 = INCH_4 + ADC10SSEL_1;          // input A4, clock = ACLK
+                ADC10AE0 |= BIT4;                          // PA.4 ADC option select
 
                 //get original value
                 ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
@@ -211,13 +213,15 @@ int main(void)
                 pot_activated = 1;
             }
 
-            ADC10CTL1 = INCH_1;                     //Ensure right channel
+            ADC10CTL0 |= SREF_0;                    //set ref to 0
+            ADC10CTL1 |= INCH_4;                     //Ensure right channel
             ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
+            ADC10AE0 |= BIT4;                          // PA.4 ADC option select
             //ADC10MEM = conversion result
             //wait for result completion, triggers interrupt when done, ADC10Iflag
-            while ((ADC10CTL1 & ADC10BUSY) == 1) {//check if busy
+            /*while ((ADC10CTL1 & ADC10BUSY) == 1) {//check if busy
                 //Wait for sample to take place
-            }
+            }*/
             value = ADC10MEM;           //Just to make sure the value doesn't change during checking
             //reset ENC
             ADC10CTL0 &= ~ENC;
@@ -228,11 +232,12 @@ int main(void)
 
                 if (change >= step_size){
                     //send message
+
+                    //change to new orig value
+                    orig_val = value;
                     //testing light
                     P1OUT ^= BIT6;
                 }
-
-                orig_val = value; //change to new orig value
 
             }
             //Code here for the potentiometer, so basically send stuff at interval checks
@@ -246,7 +251,7 @@ int main(void)
             if(!t_activated){
                 ADC10CTL0 = ADC10ON + SREF_1 + REFON;      // ADC10ON, vr+ = Vref+f, Vr- = Vss, reference on,
                 ADC10CTL1 = INCH_10 + ADC10SSEL_1;         // temp sensor, clock = ACLK
-                ADC10AE0 |= BIT1;                          // PA.1 ADC option select
+                //ADC10AE0 |= BIT1;                          // PA.1 ADC option select
 
                 //set up a timer for stabilisation, use A1
                 //need a 30microsecond delay calculation time was 0.49, putting 10 to test, need only 1 timer
@@ -262,8 +267,10 @@ int main(void)
             }
 
             if (sample_temp){
-                ADC10CTL1 = INCH_10;                //Ensure right channel
+                ADC10CTL0 |= SREF_1;                //Set ref to 1
+                ADC10CTL1 |= INCH_10;                //Ensure right channel
                 ADC10CTL0 |= ENC + ADC10SC;         // Sampling and conversion start
+                ADC10AE0 |= BIT1;                          // PA.1 ADC option select
                 //based on code for pot above
                 //ADC10MEM = conversion result
                 while ((ADC10CTL1 & ADC10BUSY) == 1) {//check if busy
@@ -280,11 +287,13 @@ int main(void)
 
                     if (change_t >= step_size_t){
                         //send message
+                        //change to new orig value
+                        orig_temp = value_temp;
                         //testing light
                         P1OUT ^= BIT0;
                     }
                 }
-                orig_temp = value_temp; //change to new orig value
+
                 //set sample to false
                 sample_temp = 0;
             }
@@ -310,15 +319,18 @@ int main(void)
         //Outputs
         //LED1
         //on/off
-        if(led1_on){
+        if(led1_on == 1){
             if (!led1_active) {
               P1DIR |= BIT0;        // P1.0 output
-              //toggle LED D1
-              P1OUT ^= BIT0;
             }
 
+            //turn on LED D1
+            P1OUT |= BIT0;
+            //set the value to 0
+            led1_on = 0;
+
         } else if(led1_on == -1) {
-            //P1OUT &= ~BIT0;         //turn light off
+            P1OUT &= ~BIT0;         //turn light off
             led1_active = 0;        //not active anymore
             led1_on = 0;
         }
@@ -343,7 +355,7 @@ int main(void)
 
         } else if (led1_blink == -2){
             led1_active = 0;
-            P1DIR &= ~BIT0;
+            P1OUT &= ~BIT0;
             deactivate_timer(activated_led1, 1);
             led1_blink = -1;
         }
@@ -369,7 +381,7 @@ int main(void)
 
         } else if (led1_fade_in == -2){
             led1_active = 0;
-            P1DIR &= ~BIT0;
+            //P1OUT &= ~BIT0; want the light on
             deactivate_timer(activated_led1, 2);
             led1_fade_in = -1;
         }
@@ -403,7 +415,7 @@ int main(void)
         } else if (led1_fade_out == -2){
             led1_fo_active = 0;
             led1_active = 0;
-            P1DIR &= ~BIT0;
+            P1OUT &= ~BIT0;
             deactivate_timer(activated_led1, 2);
             led1_fade_out = -1;
         }
@@ -427,18 +439,19 @@ int main(void)
 
         } else if (led1_breath == -2){
             led1_active = 0;
-            P1DIR &= ~BIT0;
+            P1OUT &= ~BIT0;
             deactivate_timer(activated_led1, 2);
             led1_breath = -1;
         }
 
         //LED2 on/off
-        if(led2_on){
+        if(led2_on == 1){
             if (!led2_active) {
               P1DIR |= BIT6;        // P1.6 output
-              //toggle LED D2
-              P1OUT ^= BIT6;
             }
+            //turn on LED D2
+            P1OUT |= BIT6;
+            led2_on = 0;
 
         } else if(led2_on == -1){
             P1OUT &= ~BIT6;         //turn light off
@@ -489,7 +502,7 @@ int main(void)
 
         } else if (led2_fade_in == -2){
             led2_active = 0;
-            P1DIR &= ~BIT6;
+            //P1OUT &= ~BIT6;
             deactivate_timer(activated_led2, 2);
             led2_fade_in = -1;
         }
@@ -521,7 +534,7 @@ int main(void)
         } else if (led2_fade_out == -2){
             led2_fo_active = 0;
             led2_active = 0;
-            P1DIR &= ~BIT6;
+            P1OUT &= ~BIT6;
             deactivate_timer(activated_led2, 2);
             led2_fade_out = -1;
         }
@@ -543,18 +556,20 @@ int main(void)
 
         } else if (led2_breath == -2){
             led2_active = 0;
-            P1DIR &= ~BIT6;
+            P1OUT &= ~BIT6;
             deactivate_timer(activated_led2, 2);
             led2_breath = -1;
         }
 
         //LED3 on/off
-        if(led3_on){
+        if(led3_on == 1){
             if (!led3_active) {
               P2DIR |= BIT1 + BIT3 + BIT5;        // P1.0 output
-              //LED D3, on set colour
-              P2OUT = colours[colour];
             }
+
+            //LED D3, on set colour
+            P2OUT = colours[colour];
+            led3_on = 0;
 
         } else if(led3_on == -1){
             P2OUT &= ~(BIT1 + BIT3 + BIT5);     //turn light off
@@ -614,7 +629,85 @@ int main(void)
             deactivate_timer(activated_led3, 1);
             led3_blink = -1;
         }
+
+        //fade in
+        if(led3_fade_in > -1){
+            if(!led3_active){
+                P2DIR |= BIT1 + BIT3 + BIT5;
+                P2OUT &= ~(BIT1 + BIT3 + BIT5); //don't want it on
+                //need 2 timers for the fading in
+                int counts[2] = {change_period, period_3};
+                led3_active = activate_free_timer(2, counts);
+                activated_led3[0] = activated_timers[0]; //record which ones were activated, first
+                activated_led3[1] = activated_timers[1]; //record second one
+                led3_fade_in = get_timer_code(activated_led3);
+                if (led3_active == 0) { //if return is anything but 0, has now been activated
+                    //something went wrong
+                }
+            }
+
+        } else if (led3_fade_in == -2){
+            led3_active = 0;
+            //P2OUT &= ~(BIT1 + BIT3 + BIT5);
+            deactivate_timer(activated_led3, 2);
+            led3_fade_in = -1;
+        }
+
+        //fade out
+        if(led3_fade_out > -1){
+            if(!led3_fo_active){ //if light hasn't been activated, or if on
+                P2DIR |= BIT1 + BIT3 + BIT5;
+                //need 2 timers for the fading in
+                int counts[2] = {change_period, period_3};
+                led3_fo_active = activate_free_timer(2, counts);
+                activated_led3[0] = activated_timers[0]; //record which ones were activated, first
+                activated_led3[1] = activated_timers[1]; //record second one
+                led3_fade_out = get_timer_code(activated_led3);
+                if (led3_fo_active == 0) { //if return is anything but 0, has now been activated
+                    //something went wrong
+                } else {
+                    led3_active = 1; //led is being used
+                }
+                //for testing
+                //P1OUT ^= BIT6;
+                //set the brightness to max
+                brightness_3 = max_brightness;
+                light_flag_3 = 1;
+                //need to turn on a light first, if not already on, on the specified colour
+                P2OUT |= colours[colour];
+            }
+
+        } else if (led3_fade_out == -2){
+            led3_fo_active = 0;
+            led3_active = 0;
+            P2OUT &= ~(BIT1 + BIT3 + BIT5);
+            deactivate_timer(activated_led3, 2);
+            led3_fade_out = -1;
+        }
+
+        //breathing
+        if(led3_breath > -1){
+            if(!led3_active){
+                P2DIR |= BIT1 + BIT3 + BIT5;
+                //need 2 timers for the breathing light
+                int counts[2] = {change_period, period_3};
+                led3_active = activate_free_timer(2, counts);
+                activated_led3[0] = activated_timers[0]; //record which ones were activated, first
+                activated_led3[1] = activated_timers[1]; //record second one
+                led3_breath = get_timer_code(activated_led3);
+                if (led3_active == 0) { //if return is anything but 0, has now been activated
+                    //something went wrong
+                }
+            }
+
+        } else if (led3_breath == -2){
+            led3_active = 0;
+            P2DIR &= ~(BIT1 + BIT3 + BIT5);
+            deactivate_timer(activated_led3, 2);
+            led3_breath = -1;
+        }
     }
+
 
 }
 
@@ -631,9 +724,8 @@ __interrupt void Timer0_A0 (void)
         } else if ((held == 1) && (P1IN & BIT3)){   //if button was released
             //send timer count signal here
             //led1_fade_out = 1;
-            //led1_breath = 1;
             //testing with light first
-           // P1OUT ^= BIT0;
+            //P1OUT ^= BIT6;
             held = 0;                               //button has now been released
         }
         //offset TA0CCR0 by the count number/period
@@ -664,7 +756,8 @@ __interrupt void Timer0_A0 (void)
             temp = ADC10MEM;
             // oC = ((A10/1024)*1500mV)-986mV)*1/3.55mV = A10*423/1024 - 278, taken from example
             orig_temp = ((temp - 673) * 423) / 1024;
-            TA0CCR0 = sample_temp_time;
+            timers_used[0] = sample_temp_time;
+            TA0CCR0 += sample_temp_time;
 
         } else {
             sample_temp = 1;        //start a sample
@@ -749,6 +842,21 @@ __interrupt void Timer0_A0 (void)
             P2OUT = colours[colour];
             TA0CCR0 += blink_rate_3;
         }
+    }
+
+    //fading in/out and breathing, part 1, can be 10, 11, 12, 13, 14
+    if(((led3_fade_in >= 10) && (led3_fade_in <= 14)) || ((led3_fade_out >= 10) && (led3_fade_out <= 14)) || ((led3_breath >= 10) && (led3_breath <= 14))){
+        if(counter_val_3 < brightness_3){
+            P2OUT |= colours[colour];                              //Turn on light
+        } else {
+            P2OUT &= ~(BIT1 + BIT3 + BIT5);
+        }
+        counter_val_3 += 1;                             //Increment the value to read from the array
+
+        if(counter_val_3 >= max_brightness){                       //reached max value, reset
+            counter_val_3 = 0;
+        }
+        TA0CCR0 += change_period;
     }
 }
 
@@ -974,6 +1082,75 @@ __interrupt void Timer0_A1(void){
                 TA0CCR1 += blink_rate_3;
             }
         }
+
+        //fading in/out and breathing, part 1, can be 15, 16, 17, or 18
+        if(((led3_fade_in >= 15) && (led3_fade_in <= 18)) || ((led3_fade_out >= 15) && (led3_fade_out <= 18)) || ((led3_breath >= 15) && (led3_breath <= 18))){
+            if(counter_val_3 < brightness_3){
+                P2OUT |= colours[colour];                              //Turn on light
+            } else {
+                P2OUT &= ~(BIT1 + BIT3 + BIT5);
+            }
+            counter_val_3 += 1;                             //Increment the value to read from the array
+
+            if(counter_val_3 >= max_brightness){                       //reached max value, reset
+                counter_val_3 = 0;
+            }
+            TA0CCR1 += change_period;
+        }
+
+        //fade in part 2
+        if(led3_fade_in == 10) {
+            if(light_flag_3 == 0){
+                brightness_3 += 1;                //increase brightness
+            }
+
+            if(brightness_3 == max_brightness){               //if max brightness
+                P2OUT |= colours[colour];             //leave it on
+                led3_fade_in = -1;          //completed task
+            }
+
+            TA0CCR1 += period_3;
+        }
+
+        //fade out part 2
+        if(led3_fade_out == 10) {
+            if(light_flag_3 == 1) {
+                brightness_3 -= 1;                //decrease brightness
+            }
+
+             if (brightness_3 == 0) {       //reached lowest value
+                P2OUT &= ~(BIT1 + BIT3 + BIT5);                 //keep light off
+                led3_fade_out = -2;          //completed task, deactivate it
+            }
+
+            TA0CCR1 += period_3;
+        }
+
+        //breathing part 2
+        if(led3_breath == 10){
+            if(light_flag_3 == 0){
+                brightness_3 += 1;                //increase brightness
+            } else {
+                brightness_3 -= 1;                //decrease brightness
+            }
+
+            if(brightness_3 == max_brightness){               //if max brightness
+                light_flag_3 = 1;                //set to decrease
+            } else if (brightness_3 == 0) {       //reached lowest value
+                light_flag_3 = 0;                //increase light
+                //change colour
+                //verify boundaries
+                if ((colour == 0) && (led3_dir == -1)){
+                    colour = 6;
+                } else if ((colour == 6) && (led3_dir == 1)){
+                    colour = 0;
+                } else {
+                    colour = colour + led3_dir; //change colour based on direction
+                }
+            }
+
+            TA0CCR1 += period_3;
+        }
         break;
     case 4:
         //check for how long button was pressed
@@ -1192,6 +1369,74 @@ __interrupt void Timer0_A1(void){
                 P2OUT = colours[colour];
                 TA0CCR2 += blink_rate_3;
             }
+        }
+        //fading in/out and breathing, part 1, can be 19, 20, or 21
+        if(((led3_fade_in >= 19) && (led3_fade_in <= 21)) || ((led3_fade_out >= 19) && (led3_fade_out <= 21)) || ((led3_breath >= 19) && (led3_breath <= 21))){
+            if(counter_val_3 < brightness_3){
+                P2OUT |= colours[colour];                              //Turn on light
+            } else {
+                P2OUT &= ~(BIT1 + BIT3 + BIT5);
+            }
+            counter_val_3 += 1;                             //Increment the value to read from the array
+
+            if(counter_val_3 >= max_brightness){                       //reached max value, reset
+                counter_val_3 = 0;
+            }
+            TA0CCR2 += change_period;
+        }
+
+        //fade in part 2
+        if((led3_fade_in == 11) || (led3_fade_in == 15)) {
+            if(light_flag_3 == 0){
+                brightness_3 += 1;                //increase brightness
+            }
+
+            if(brightness_3 == max_brightness){               //if max brightness
+                P2OUT |= colours[colour];             //leave it on
+                led3_fade_in = -1;          //completed task
+            }
+
+            TA0CCR2 += period_3;
+        }
+
+        //fade out part 2
+        if((led3_fade_out == 11) || (led3_fade_out == 15)) {
+            if(light_flag_3 == 1) {
+                brightness_3 -= 1;                //decrease brightness
+            }
+
+             if(brightness_3 == 0) {       //reached lowest value
+                P2OUT &= ~(BIT1 + BIT3 + BIT5);    //keep light off
+                led3_fade_out = -2;          //completed task, deactivate it
+            }
+
+            TA0CCR2 += period_3;
+        }
+
+        //breathing part 2
+        if((led3_breath == 11) || (led3_breath == 15)){
+            if(light_flag_3 == 0){
+                brightness_3 += 1;                //increase brightness
+            } else {
+                brightness_3 -= 1;                //decrease brightness
+            }
+
+            if(brightness_3 == max_brightness){               //if max brightness
+                light_flag_3 = 1;                //set to decrease
+            } else if (brightness_3 == 0) {       //reached lowest value
+                light_flag_3 = 0;                //increase light
+                //change colour
+                //verify boundaries
+                if ((colour == 0) && (led3_dir == -1)){
+                    colour = 6;
+                } else if ((colour == 6) && (led3_dir == 1)){
+                    colour = 0;
+                } else {
+                    colour = colour + led3_dir; //change colour based on direction
+                }
+            }
+
+            TA0CCR2 += period_2;
         }
         break;
 
@@ -1421,6 +1666,75 @@ __interrupt void Timer1_A0 (void)
             TA1CCR0 += blink_rate_3;
         }
     }
+
+    //fading in/out and breathing, part 1, can be 22 or 23
+    if(((led3_fade_in == 22) && (led3_fade_in == 23)) || ((led3_fade_out == 22) && (led3_fade_out == 23)) || ((led3_breath == 22) && (led3_breath == 23))){
+        if(counter_val_3 < brightness_3){
+            P2OUT |= colours[colour];                              //Turn on light
+        } else {
+            P2OUT &= ~(BIT1 + BIT3 + BIT5);
+        }
+        counter_val_3 += 1;                             //Increment the value to read from the array
+
+        if(counter_val_3 >= max_brightness){                       //reached max value, reset
+            counter_val_3 = 0;
+        }
+        TA1CCR0 += change_period;
+    }
+
+    //fade in part 2
+    if((led3_fade_in == 12) || (led3_fade_in == 16) || (led3_fade_in == 19)) {
+        if(light_flag_3 == 0){
+            brightness_3 += 1;                //increase brightness
+        }
+
+        if(brightness_3 == max_brightness){               //if max brightness
+            P2OUT |= colours[colour];             //leave it on
+            led3_fade_in = -1;          //completed task
+        }
+
+        TA1CCR0 += period_3;
+    }
+
+    //fade out part 2
+    if((led3_fade_out == 12) || (led3_fade_out == 16) || (led3_fade_out == 19)) {
+        if(light_flag_3 == 1) {
+            brightness_3 -= 1;                //decrease brightness
+        }
+
+         if (brightness_3 == 0) {       //reached lowest value
+            P2OUT &= ~(BIT1 + BIT3 + BIT5);                 //keep light off
+            led3_fade_out = -2;          //completed task, deactivate it
+        }
+
+        TA1CCR0 += period_3;
+    }
+
+    //breathing part 2
+    if((led3_breath == 12) || (led3_breath == 16) || (led3_breath == 19)){
+        if(light_flag_3 == 0){
+            brightness_3 += 1;                //increase brightness
+        } else {
+            brightness_3 -= 1;                //decrease brightness
+        }
+
+        if(brightness_3 == max_brightness){               //if max brightness
+            light_flag_3 = 1;                //set to decrease
+        } else if (brightness_3 == 0) {       //reached lowest value
+            light_flag_3 = 0;                //increase light
+            //change colour
+            //verify boundaries
+            if ((colour == 0) && (led3_dir == -1)){
+                colour = 6;
+            } else if ((colour == 6) && (led3_dir == 1)){
+                colour = 0;
+            } else {
+                colour = colour + led3_dir; //change colour based on direction
+            }
+        }
+
+        TA1CCR0 += period_3;
+    }
 }
 
 //interrupt for timerA1
@@ -1627,6 +1941,75 @@ __interrupt void Timer1_A1(void){
                 TA1CCR1 += blink_rate_3;
             }
         }
+
+        //fading in/out and breathing, part 1, can be 24
+        if((led3_fade_in == 22) || (led3_fade_out == 24) || (led3_breath == 24)){
+            if(counter_val_3 < brightness_3){
+                P2OUT |= colours[colour];                              //Turn on light
+            } else {
+                P2OUT &= ~(BIT1 + BIT3 + BIT5);
+            }
+            counter_val_3 += 1;                             //Increment the value to read from the array
+
+            if(counter_val_3 >= max_brightness){                       //reached max value, reset
+                counter_val_3 = 0;
+            }
+            TA1CCR1 += change_period;
+        }
+
+        //fade in part 2
+        if((led3_fade_in == 13) || (led3_fade_in == 17) || (led3_fade_in == 20) || (led3_fade_in == 22)) {
+            if(light_flag_3 == 0){
+                brightness_3 += 1;                //increase brightness
+            }
+
+            if(brightness_3 == max_brightness){               //if max brightness
+                P2OUT |= colours[colour];             //leave it on
+                led3_fade_in = -1;          //completed task
+            }
+
+            TA1CCR1 += period_3;
+        }
+
+        //fade out part 2
+        if((led3_fade_out == 13) || (led3_fade_out == 17) || (led3_fade_out == 20) || (led3_fade_out == 22)) {
+            if(light_flag_3 == 1) {
+                brightness_3 -= 1;                //decrease brightness
+            }
+
+             if (brightness_3 == 0) {       //reached lowest value
+                P2OUT &= ~(BIT1 + BIT3 + BIT5);   //keep light off
+                led3_fade_out = -2;          //completed task, deactivate it
+            }
+
+            TA1CCR1 += period_3;
+        }
+
+        //breathing part 2
+        if((led3_breath == 13) || (led3_breath == 17) || (led3_breath == 20) || (led3_breath == 22)){
+            if(light_flag_3 == 0){
+                brightness_3 += 1;                //increase brightness
+            } else {
+                brightness_3 -= 1;                //decrease brightness
+            }
+
+            if(brightness_3 == max_brightness){               //if max brightness
+                light_flag_3 = 1;                //set to decrease
+            } else if (brightness_3 == 0) {       //reached lowest value
+                light_flag_3 = 0;                //increase light
+                //change colour
+                //verify boundaries
+                if ((colour == 0) && (led3_dir == -1)){
+                    colour = 6;
+                } else if ((colour == 6) && (led3_dir == 1)){
+                    colour = 0;
+                } else {
+                    colour = colour + led3_dir; //change colour based on direction
+                }
+            }
+
+            TA1CCR1 += period_3;
+        }
         break;
     case 4:
         //check for how long button was pressed
@@ -1811,6 +2194,59 @@ __interrupt void Timer1_A1(void){
                 P2OUT = colours[colour];
                 TA1CCR2 += blink_rate_3;
             }
+        }
+        //fade in part 2
+        if((led3_fade_in == 14) || (led3_fade_in == 18) || (led3_fade_in == 21) || (led3_fade_in == 23) || (led3_fade_in == 24)) {
+            if(light_flag_3 == 0){
+                brightness_3 += 1;                //increase brightness
+            }
+
+            if(brightness_3 == max_brightness){               //if max brightness
+                P2OUT |= colours[colour];             //leave it on
+                led3_fade_in = -1;          //completed task
+            }
+
+            TA1CCR2 += period_3;
+        }
+
+        //fade out part 2
+        if((led3_fade_out == 14) || (led3_fade_out == 18) || (led3_fade_out == 21) || (led3_fade_out == 23) || (led3_fade_out == 24)) {
+            if(light_flag_3 == 1) {
+                brightness_3 -= 1;                //decrease brightness
+            }
+
+             if(brightness_3 == 0) {       //reached lowest value
+                P2OUT &= ~(BIT1 + BIT3 + BIT5); //keep light off
+                led3_fade_out = -2;          //completed task, deactivate it
+            }
+
+            TA1CCR2 += period_3;
+        }
+
+        //breathing part 2
+        if((led3_breath == 14) || (led3_breath == 18) || (led3_breath == 21) || (led3_breath == 23) || (led3_breath == 24)){
+            if(light_flag_3 == 0){
+                brightness_3 += 1;                //increase brightness
+            } else {
+                brightness_3 -= 1;                //decrease brightness
+            }
+
+            if(brightness_3 == max_brightness){               //if max brightness
+                light_flag_3 = 1;                //set to decrease
+            } else if (brightness_3 == 0) {       //reached lowest value
+                light_flag_3 = 0;                //increase light
+                //change colour
+                //verify boundaries
+                if ((colour == 0) && (led3_dir == -1)){
+                    colour = 6;
+                } else if ((colour == 6) && (led3_dir == 1)){
+                    colour = 0;
+                } else {
+                    colour = colour + led3_dir; //change colour based on direction
+                }
+            }
+
+            TA1CCR2 += period_3;
         }
         break;
 
