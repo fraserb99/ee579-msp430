@@ -1,0 +1,103 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+
+const char* serverName = "https://ee579-dev-api.azurewebsites.net/devices/register";
+WiFiClient espClient;
+PubSubClient client(espClient);
+char incomingBuffer[500];
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.mode(WIFI_STA); //WPS only works in station mode
+  delay(1000);
+  WiFi.begin("", "");
+  delay(4000);
+  // Check if WiFi is already connected and if not, begin the WPS process.
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.println("connecting using WPS");
+    WiFi.beginWPSConfig();
+    delay(3000); //delay to give it a chance
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("Connected");
+    }
+    else {
+      Serial.println("Connection failed!");
+    }
+  }
+  Serial.println("already connected");
+
+  String post_data = "{\"deviceId\":\"" + WiFi.macAddress() + "\"}";
+  Serial.println(post_data);
+  HTTPClient http;
+  http.begin(serverName, "8b00830bccf246f796d38eb5e12fcfbd1d3a6150");
+  http.addHeader("Content-Type", "application/json");
+  int httpResponseCode = http.POST(post_data);
+  if (httpResponseCode > 0) {
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    String payload = http.getString();
+
+    Serial.println(payload);
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, payload);
+    JsonObject obj = doc.as<JsonObject>();
+    const char* password = obj[String("password")];
+    const int port = obj[String("port")];
+    const char* host = obj[String("host")];
+    const char* topic = obj[String("topic")];
+    const char* device_name = WiFi.macAddress().c_str();
+    Serial.println(password);
+    Serial.println(port);
+    Serial.println(host);
+    Serial.println(topic);
+    client.setServer(host, port);
+    client.setCallback(callback);
+
+    while (!client.connected()) {
+      Serial.println("Connecting to MQTT...");
+      String user = WiFi.macAddress();
+      if (client.connect(device_name, user.c_str(), password)) {
+        Serial.println("connected");
+        client.subscribe(topic);
+      } else {
+
+        Serial.print("failed with state ");
+        Serial.print(client.state());
+        Serial.println("");
+        delay(2000);
+      }
+    }
+  } else {
+    Serial.print("Error code: ");
+    Serial.println(httpResponseCode);
+  }
+  // Free resources
+  http.end();
+}
+
+
+
+void callback(char* topic, byte * payload, unsigned int length) {
+
+  Serial.print("Message arrived in topic: ");
+  Serial.println(topic);
+
+  Serial.print("Message:");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+
+  Serial.println();
+  Serial.println("-----------------------");
+
+}
+
+void loop() {
+  if (Serial.available() > 0) {
+    char incoming = Serial.readBytesUntil('\n', incomingBuffer, 500);
+    Serial.println(incomingBuffer);
+    memset(incomingBuffer, 0, sizeof(incomingBuffer));
+  }
+}
