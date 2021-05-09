@@ -742,7 +742,7 @@ int main(void)
 
 }
 
-//interrupts
+//interrupts, duplicated code to allow for the optimum timer useage
 //timer A0
 #pragma vector=TIMER0_A0_VECTOR
 __interrupt void Timer0_A0 (void)
