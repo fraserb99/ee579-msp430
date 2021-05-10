@@ -183,21 +183,21 @@ int main(void)
 	//stuff for testing
 	//P1DIR |= BIT0 + BIT6;      // P1.0, P1.6 output
 	//P2DIR |= BIT1;             //utilise D3
-	button = 1;
-	button2 = 1;
+	//button = 1;
+	//button2 = 1;
 	//pot = 1;
 	//thermometer = 1;
 	//led1_blink = 1;
 	//blink_rate_3 = 32768;
 	//led3_on = 1;
-	led1_blink = 1;
+	//led3_blink = 1;
 	//led3_rot = 1;
 	//led3_dir = 1;
 	//led1_breath = 1;
-	//led2_breath = 1;
-    //led1_fade_in = 1;
+	//led3_breath = 1;
+    //led3_fade_in = 1;
 	//led3_fade_out = 1;
-	buzzer_tone = 1;
+	//buzzer_beep = 1;
 
 	//UART stuff
     //reserve timer A0_0 for UART, arbitrary nr for now:
@@ -1096,9 +1096,9 @@ __interrupt void Timer0_A1(void){
                 send[0][1] = 1; //set flag
                 send[1][1] = timer_count; //the time held
 
-                led3_rot = 1;
                 //testing with light first
-               // P1OUT ^= BIT0;
+                //P1OUT ^= BIT0;
+                led1_blink = 1;
                 held = 0;                               //button has now been released
                 //set timer count to 0
                 TA0CCR1 = 0;
@@ -1109,7 +1109,7 @@ __interrupt void Timer0_A1(void){
                  timer_count = 0;                     //Reset the timer count
                  pressed = 0;                        //reset pressed
                  held = 1;                           //Button is being held
-                 P1OUT ^= BIT6;
+                 //P1OUT ^= BIT6;
                  //offset TA0CCR0 by the count number/period
                  //change the value held in the array
                  timers_used[0] = count_b;
@@ -1144,7 +1144,7 @@ __interrupt void Timer0_A1(void){
                  timer_count2 = 0;                     //Reset the timer count
                  pressed2 = 0;                        //reset pressed
                  held2 = 1;                           //Button is being held
-                 P1OUT ^= BIT0;
+                 //P1OUT ^= BIT6;
                  //offset TA0CCR0 by the count number/period
                  //change the value held in the array
                  timers_used[0] = count_b2;
@@ -1508,6 +1508,8 @@ __interrupt void Timer0_A1(void){
                 send[0][1] = 1; //set flag
                 send[1][1] = timer_count2; //the time held
 
+                //testing
+                buzzer_beep = -1;
                 held2 = 0;                               //button has now been released
                 TA0CCR2 = 0;
             }
