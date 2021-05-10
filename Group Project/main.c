@@ -9,11 +9,38 @@
  */
 
 //Global variables and constants
-//inputs
+//sending messages
+/** first row is flag, second is value to send, codes for index:
+*   0 = error, 1 = button, 2 = button2, 3 = potentiometer, 4 = temperature
+*
+*   for error if value is 1 - generic, if value is 2 - no more timers, 3 - clashing rules
+*/
+int send[2][5] = {{0, 0, 0, 0, 0},
+                  {0, 0, 0, 0, 0}};
+unsigned int send_message = 0;                  //flag used to indicate that at least one message needs to be sent
+
+/* Description of codes used for the timers, A0_0 is reserved for UART
+ * for those with 1 timer:
+ * A0_1 = 1, A0_2 = 2, A1_0 = 3, A1_1 = 4, A1_2 = 5
+ *
+ * For 2 timers
+ * A0_0 +           A0_1 +          A0_2 +          A1_0 +          A1_1 +
+ *      A0_1 = 10,      A0_2 = 15,      A1_0 = 19,      A1_1 = 22,      A1_2 = 24,
+ *      A0_2 = 11,      A1_0 = 16,      A1_1 = 20,      A1_2 = 23,
+ *      A1_0 = 12,      A1_1 = 17,      A1_2 = 21,
+ *      A1_1 = 13,      A1_2 = 18,
+ *      A1_2 = 14,
+ *
+ *
+ */
+
+/**inputs
+ * The codes for activation are based on the timers, if value is 0 that means not active, if -1 means disable/deactivate
+ */
 //button stuff
-signed int button = -1;                         //Button variable, depends on timer used
+signed int button = 0;                         //Button variable, depends on timer used
 unsigned int b_activated = 0;                   //boolean for denoting button activation
-unsigned int timerCount = 0;                    //initial count for the wait time
+unsigned int timer_count = 0;                    //initial count for the wait time
 unsigned int pressed = 0;                       //checking for pressed state, used for debouncing
 unsigned int held = 0;                          //checking if the button is being pressed/held
 const int debounce_b = 328;                     //count for the 50Hz, based on 32768/(2*x)= 50, want a 20ms wait for the debouncing, 1/20*10^-3 = 50
@@ -21,9 +48,9 @@ const int count_b = 820;                        //count for the count for presse
 int activated_button[];                         //indicator for activated timer for the button
 
 //Button 2 (called switch
-signed int button2 = -1;                        //Button 2 variable
+signed int button2 = 0;                        //Button 2 variable
 unsigned int b2_activated = 0;                  //button 2 activation
-unsigned int timerCount2 = 0;                   //initial count for the wait time
+unsigned int timer_count2 = 0;                   //initial count for the wait time
 unsigned int pressed2 = 0;                      //checking for pressed state, used for debouncing
 unsigned int held2 = 0;                         //checking if the button is being pressed/held
 const int debounce_b2 = 164;                    //count for the 100Hz, based on 32768/(2*x)= 100, want a 10ms wait for the debouncing, 1/20*10^-3 = 50
@@ -31,7 +58,7 @@ const int count_b2 = 820;                       //count for the count for presse
 int activated_button2[];                        //indicator for activated timer for the button
 
 //potentiometer stuff
-unsigned int pot = 0;                           //Potentiometer use
+signed int pot = 0;                             //Potentiometer use
 unsigned int pot_activated = 0;                 //boolean for denoting potentiometer activation
 unsigned int orig_val = 0;                      //Setting up value for original potentiometer vale
 unsigned int value = 0;                         //value on check
@@ -39,7 +66,7 @@ signed int change = 0;                          //value to check how much the po
 const int step_size = 100;                       //value to indicate step size
 
 //temp stuff
-signed int thermometer = -1;                    //thermometer use
+signed int thermometer = 0;                    //thermometer use
 unsigned int t_activated = 0;                   //boolean for denoting thermometer activation
 signed int orig_temp = 0;                       //Setting up value for original potentiometer vale
 signed int value_temp = 0;                      //value on check
@@ -51,8 +78,9 @@ unsigned int sample_temp = 0;                   //boolean to be used to indicate
 const int sample_temp_time = 16384;             //used for sample time of the temperature 16384
 int activated_temp[];                           //indicator for activated timer for the temperature
 
-//Outputs
-//constants for breathing and fading lights, same for all LEDs independent of user defined speeds
+/**Outputs
+ * constants for breathing and fading lights, same for all LEDs independent of user defined speeds
+ */
 const int max_brightness = 32;                  //used for checking max value for brightness and counter value
 const int change_period = 16;                   //period for flashing and breathing, default values
 const int brightness_register_1 = 4096;         //used for brightness increment timing, 1Hz, first setting
@@ -62,10 +90,10 @@ const int brightness_register_3 = 1024;         //used for brightness increment 
 signed int led1_on = 0;                         //LED D1 on, 0 indicate off, -1 - deactivate
 unsigned int led1_active = 0;                   //check if the light has been activated - can only have one setting on at a time
 unsigned int led1_fo_active = 0;                //own activation check for fade out as that can turn lights of that are on, if wanted
-signed int led1_blink = -1;                     //LED1 blinking light
-signed int led1_fade_in = -1;                   //LED1 fade in
-signed int led1_fade_out = -1;                  //LED1 fade out
-signed int led1_breath = -1;                    //LED1 blinking light
+signed int led1_blink = 0;                     //LED1 blinking light
+signed int led1_fade_in = 0;                   //LED1 fade in
+signed int led1_fade_out = 0;                  //LED1 fade out
+signed int led1_breath = 0;                    //LED1 blinking light
 unsigned int blink_rate_1 = 16384;              //rate for the blinking light of LED D1, default period 1Hz
 unsigned int light_flag_1 = 0;                  //breathing and fading light flag, brighter or darker,  brighter = 0, darker = 1;
 unsigned int brightness_1 = 0;                  // Varies brightness between 0 and 32
@@ -77,10 +105,10 @@ int activated_led1[];                           //Array for activated timers for
 signed int led2_on = 0;                         //LED D2 on
 unsigned int led2_active = 0;                   //LED2 active
 unsigned int led2_fo_active = 0;                //own activation check for fade out as that can turn lights of that are on, if wanted
-signed int led2_blink = -1;                     //LED2 blink
-signed int led2_fade_in = -1;                   //LED2 fade in
-signed int led2_fade_out = -1;                  //LED2 fade out
-signed int led2_breath = -1;                    //LED2 breathing light
+signed int led2_blink = 0;                     //LED2 blink
+signed int led2_fade_in = 0;                   //LED2 fade in
+signed int led2_fade_out = 0;                  //LED2 fade out
+signed int led2_breath = 0;                    //LED2 breathing light
 unsigned int blink_rate_2 = 16384;              //rate for the blinking light of LED D2, default period 1Hz
 unsigned int light_flag_2 = 0;                  //breathing and fading light flag, brighter or darker,  brighter = 0, darker = 1;
 unsigned int brightness_2 = 0;                  //varies brightness between 0 and 32
@@ -92,13 +120,13 @@ int activated_led2[];                          //Array for activated timers for 
 signed int led3_on = 0;                         //LED D3 on/off, colour light
 unsigned int led3_active = 0;                   //LED3 active
 unsigned int led3_fo_active = 0;                //own activation check for fade out as that can turn lights of that are on, if wanted
-signed int led3_rot = -1;                       //rotate led3
+signed int led3_rot = 0;                       //rotate led3
 signed int led3_dir = 0;                        //LED3 direction of rotation, -1 for backwards and 1 for forwards
-signed int led3_blink = -1;                     //LE3 blink
+signed int led3_blink = 0;                     //LE3 blink
 unsigned int led3_blink_on = 0;                 //used to indicate on or off light
-signed int led3_fade_in = -1;                   //LED3 fade in
-signed int led3_fade_out = -1;                  //LED3 fade out
-signed int led3_breath = -1;                    //LED3 blinking light
+signed int led3_fade_in = 0;                   //LED3 fade in
+signed int led3_fade_out = 0;                  //LED3 fade out
+signed int led3_breath = 0;                    //LED3 blinking light
 //define all the colours
 #define RED (BIT1)
 #define GREEN (BIT3)
@@ -118,7 +146,7 @@ unsigned int period_3 = 2048;                    //period for flashing and breat
 int activated_led3[];                           //Array for activated timers for the colour led
 
 //buzzer stuff
-signed int buzzer_tone = 0;                  //buzzer on, for specific period
+signed int buzzer_tone = 0;                    //buzzer on, for specific period
 signed int buzzer_beep = 0;                     //buzzer beeping
 unsigned int buzzer_active = 0;                 //boolean for indicating that the buzzer has been activated/is being used
 unsigned int buzzer_on = 0;                     //boolean used for indicating if the buzzer is on during the beep one
@@ -128,38 +156,24 @@ unsigned int buzzer_count = 0;                  //counter variable for the on pe
 const int buzzer_period = 82;                 //timer for counting the required on period, 50ms = 20Hz
 int activated_buzzer[];                         //Array for activated timer for the buzzer
 
-//array for timer usage, 0 if not used, 1 if used 0, pos 0:TA0_0, 1:TA0_1, 2:TA0_2, 3:TA1_0, 4: TA1_1, 5:TA1_2
+//array for timer usage, 0 if not used, 1 if used 0,
+//pos as timer codes, 0 is here to verify uart timing
 unsigned int timers_used[6] = {0, 0, 0, 0, 0, 0};
 unsigned int timer0_activated = 0;              //Boolean used for checking if TA0 has been activated
 unsigned int timer1_activated = 0;              //Boolean used for checking if TA1 has been activated
 signed int activated_timers[2] = {-1, -1};      //array for activated timers for each activation
 
-//array for used lights If 1 means active, if 0 not active, Returns array of status for each light, pos0 = D1, pos1 = D2, pos3 = D3
-unsigned int lights_used[3] = {0, 0, 0};
+//array for used lights If 1 means active, if 0 not active,
+//Returns array of status for each light, pos0 = D1, pos1 = D2, pos3 = D3
+unsigned int lights_used[3] = {0, 0, 0}; //is this still needed???
 //arrays for breathing and fading lights
 
-//declare helper functions
+//declaration of helper functions
 int activate_timer(int timer_no, int count1, int count2);       //function for activating a specific timer
 int activate_free_timer(int registers, int counts[]);           //function for activating required number of free timers
 void deactivate_timer(int activated[], int len);                //deactivate unused timers
 int get_timer_code(int timers[]);                               //get the specific timer code for 2 timers
 
-
-/* Description of codes used for the timers:
- * for those with 1 timer:
- * A0_0 = 0, A0_1 = 1, A0_2 = 2, A1_0 = 3, A1_1 = 4, A1_2 = 5
- *
- * For 2 timers
- * A0_0 +           A0_1 +          A0_2 +          A1_0 +          A1_1 +
- *      A0_1 = 10,      A0_2 = 15,      A1_0 = 19,      A1_1 = 22,      A1_2 = 24,
- *      A0_2 = 11,      A1_0 = 16,      A1_1 = 20,      A1_2 = 23,
- *      A1_0 = 12,      A1_1 = 17,      A1_2 = 21,
- *      A1_1 = 13,      A1_2 = 18,
- *      A1_2 = 14,
- *
- * -2 indicate disable/turn off, -1 is the equivalent of off
- *
- */
 
 //main function
 int main(void)
@@ -170,19 +184,31 @@ int main(void)
 	//P1DIR |= BIT0 + BIT6;      // P1.0, P1.6 output
 	//P2DIR |= BIT1;             //utilise D3
 	button = 1;
-	//button2 = 1;
+	button2 = 1;
 	//pot = 1;
 	//thermometer = 1;
 	//led1_blink = 1;
 	//blink_rate_3 = 32768;
 	//led3_on = 1;
-	//led1_blink = 1;
+	led1_blink = 1;
 	//led3_rot = 1;
 	//led3_dir = 1;
 	//led1_breath = 1;
+	//led2_breath = 1;
     //led1_fade_in = 1;
 	//led3_fade_out = 1;
-	buzzer_beep = 1;
+	buzzer_tone = 1;
+
+	//UART stuff
+    //reserve timer A0_0 for UART, arbitrary nr for now:
+    //returns 1 on success
+    int uart_timer = activate_timer(0, 16384, 0);
+    if(uart_timer != 1){
+        //error occurred
+        send_message = 1;
+        send[0][0] = 1; //set flag
+        send[1][0] = 1; //generic error
+    }
 
 
 
@@ -192,9 +218,58 @@ int main(void)
         //read messages here
 
 
-        //input
+        //sending messages
+        if(send_message){ //there is a message to send
+            int i, to_send, value;
+            for(i=0; i<5; i++){ //loop through and check for flag
+
+                if(send[0][i] == 1){ //if the flag is set
+                    to_send = i;      //say which one to send
+                }
+
+                switch(to_send){
+                case 0:
+                    //send error message here
+                    //value = send[1][0]
+                    //reset flag
+                    send[0][0] = 0;
+                    break;
+                case 1:
+                    //send message for button
+                    //value is the time the button has been pressed for
+                    //counts every 50ms so multiply by 50, to get total time in ms
+                    value = send[1][1]*50;
+                    //reset flag
+                    send[0][1] = 0;
+                    break;
+                case 2:
+                    //send message for second button, hold time in ms
+                    value = send[1][2]*50;
+                    send[0][2] = 0;
+                    break;
+                case 3:
+                    //send message for potentiometer
+                    //value stored in send[1][3]
+                    send[0][3] = 0;
+                    break;
+                case 4:
+                    //send message for temperature, in degrees C
+                    //value stored in send[1][4]
+                    send[0][4] = 0;
+                    break;
+                default:
+                    //something went wrong
+                    break;
+                }
+            }
+            //reset the send message flag
+            send_message = 0;
+        }
+
+
+        //inputs
         //check if button was requested
-        if (button > -1){
+        if (button > 0){
             if (!b_activated){ //if not already activated
                 //button set up, from slides and previous challenge
                 P1OUT |= BIT3;                            //pull up resistor on P1.3
@@ -210,22 +285,53 @@ int main(void)
                 button = activated_button[0];                //assign to check properly for timer interrupts
                 if (b_activated != 1) { //if return is 1, has now been activated
                     //something went wrong
-                    //for testing
-                    P1OUT ^= BIT6;
+                    //send error
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic error
+                    //disable button
+                    button = -1;
+                } else {
+                        //turn of the timer for now, still being used, just doesnt need to trigger atm
+                    switch (button){
+                    case 1:
+                        TA0CCR1 = 0;
+                        break;
+                    case 2:
+                        TA0CCR2 = 0;
+                        break;
+                    case 3:
+                        TA1CCR0 = 0;
+                        break;
+                    case 4:
+                        TA1CCR1 = 0;
+                        break;
+                    case 5:
+                        TA1CCR2 = 0;
+                        break;
+                    default:
+                        //something went wrong, send error
+                        send_message = 1;
+                        send[0][0] = 1; //set flag
+                        send[1][0] = 1; //generic error
+                        button = -1; //disable button as wrong timer used
+                        break;
+                    }
                 }
+
             }
-        } else if(button == -2){
+        } else if(button == -1){
             b_activated = 0;                        //if button is no longer requested
             deactivate_timer(activated_button, 2);   //turn off timer
             P1IE &= ~BIT3;                          //and button interrupt
-            P1REN |= BIT3;                          // and dissable the pullup/pulldown
-            button = -1;
+            P1REN |= BIT3;                          // and disable the pullup/pulldown
+            button = 0; //set to default (off)
         }
 
 
         //check button 2, same code as button 1 pretty much, just different pins
         //Copied from button 1
-        if (button2 > -1){
+        if (button2 > 0){
             if (!b2_activated){ //if not already activated
                 P1OUT |= BIT5;                            //pull up resistor on P1.5
                 P1REN |= BIT5;                            //Enable it
@@ -240,125 +346,188 @@ int main(void)
                 button2 = activated_button2[0];                //assign to check properly for timer interrupts
                 if (b2_activated != 1) { //if return is 1, has now been activated
                     //something went wrong
-                    //for testing
-                    P1OUT ^= BIT6;
+                    //send error
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic error
+                    //disable button
+                    button2 = -1;
+                } else {
+                    //turn of the timer for now
+                    switch (button2){
+                    case 1:
+                        TA0CCR1 = 0;
+                        break;
+                    case 2:
+                        TA0CCR2 = 0;
+                        break;
+                    case 3:
+                        TA1CCR0 = 0;
+                        break;
+                    case 4:
+                        TA1CCR1 = 0;
+                        break;
+                    case 5:
+                        TA1CCR2 = 0;
+                        break;
+                    default:
+                        //Something went wrong, send generic error message
+                        send_message = 1;
+                        send[0][0] = 1; //set flag
+                        send[1][0] = 1; //generic error
+                        button2 = -1; //disable button
+                        break;
+                    }
                 }
             }
-        } else if(button2 == -2){
+
+        } else if(button2 == -1){
             b2_activated = 0;                        //if button is no longer requested
             deactivate_timer(activated_button2, 2);   //turn off timer
             P1IE &= ~BIT5;                          //and button interrupt
-            P1REN |= BIT5;                          // and dissable the pullup/pulldown
-            button2 = -1;
+            P1REN |= BIT5;                          // and disable the pullup/pulldown
+            button2 = 0;
         }
 
-        //need checks to see if potentiometer was requested
-        if (pot){
-            if(!pot_activated){ //if not already activated
-                ADC10CTL0 = ADC10ON + CONSEQ_0;            // ADC10ON, single channel single sample
-                ADC10CTL1 = INCH_4 + ADC10SSEL_1;          // input A4, clock = ACLK
-                ADC10AE0 |= BIT4;                          // PA.4 ADC option select
+        //pot
+        //can only run timer or pot
+        //TODO: fix timer here
+        if (pot > 0){
+            if(t_activated) {
+                //send error message as both can't be active
+                send_message = 1;
+                send[0][0] = 1; //set flag
+                send[1][0] = 3; //clashing rules
+                //disable pot
+                pot = -1;
+            } else {
+                if(!pot_activated){         //if not already activated
+                    ADC10CTL0 = ADC10ON + CONSEQ_0 + SREF_0;   // ADC10ON, single channel single sample, ref 0
+                    ADC10CTL1 = INCH_4 + ADC10SSEL_1;          // input A4, clock = ACLK
+                    ADC10AE0 |= BIT4;                          // PA.4 ADC option select
 
-                //get original value
+                    //get original value
+                    ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
+                    orig_val = ADC10MEM;
+                    pot_activated = 1;
+                } else
+                //TODO: remove comments if the code can work with temp
+                //ADC10CTL0 |= SREF_0;                    //set ref to 0
+                //ADC10CTL1 |= INCH_4;                     //Ensure right channel
                 ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
-                orig_val = ADC10MEM;
-                pot_activated = 1;
-            }
+                //ADC10AE0 |= BIT4;                          // PA.4 ADC option select
+                //ADC10MEM = conversion result
+                //wait for result completion, triggers interrupt when done, ADC10Iflag
+                /*while ((ADC10CTL1 & ADC10BUSY) == 1) {//check if busy
+                    //Wait for sample to take place
+                }*/
+                value = ADC10MEM;           //Just to make sure the value doesn't change during checking
+                //reset ENC
+                ADC10CTL0 &= ~ENC;
 
-            ADC10CTL0 |= SREF_0;                    //set ref to 0
-            ADC10CTL1 |= INCH_4;                     //Ensure right channel
-            ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
-            ADC10AE0 |= BIT4;                          // PA.4 ADC option select
-            //ADC10MEM = conversion result
-            //wait for result completion, triggers interrupt when done, ADC10Iflag
-            /*while ((ADC10CTL1 & ADC10BUSY) == 1) {//check if busy
-                //Wait for sample to take place
-            }*/
-            value = ADC10MEM;           //Just to make sure the value doesn't change during checking
-            //reset ENC
-            ADC10CTL0 &= ~ENC;
+                if(value != orig_val){ //if value has changed
+                    //check by how much
+                    change = abs(orig_val - value);
 
-            if(value != orig_val){ //if value has changed
-                //check by how much
-                change = abs(orig_val - value);
+                    if (change >= step_size){
+                        //send message
+                        send_message = 1;
+                        send[0][3] = 1; //set flag
+                        send[1][3] = value; //value of pot
 
-                if (change >= step_size){
-                    //send message
+                        //change to new orig value
+                        orig_val = value;
+                        //testing light
+                        P1OUT ^= BIT6;
+                    }
 
-                    //change to new orig value
-                    orig_val = value;
-                    //testing light
-                    P1OUT ^= BIT6;
                 }
-
             }
+
             //Code here for the potentiometer, so basically send stuff at interval checks
-        } else {
+        } else if(pot == -1){
             pot_activated = 0;
         }
 
         //check if thermometer was requested
-        if(thermometer > -1){
-            //based on example adc10_temp.c from URL: http://dev.ti.com/tirex/explore/node?node=AEldOKIXgnT979MckUlLRw__IOGqZri__LATEST
-            if(!t_activated){
-                ADC10CTL0 = ADC10ON + SREF_1 + REFON;      // ADC10ON, vr+ = Vref+f, Vr- = Vss, reference on,
-                ADC10CTL1 = INCH_10 + ADC10SSEL_1;         // temp sensor, clock = ACLK
-                //ADC10AE0 |= BIT1;                          // PA.1 ADC option select
+        if(thermometer > 0){
+            //check for pot first
+            if(pot_activated){
+                //send error
+                send_message = 1;
+                send[0][0] = 1; //set flag
+                send[1][0] = 3; //clashing rules
+                //Disable temp
+                thermometer = -1;
+            } else{
+                //based on example adc10_temp.c from URL: http://dev.ti.com/tirex/explore/node?node=AEldOKIXgnT979MckUlLRw__IOGqZri__LATEST
+                if(!t_activated){
+                    ADC10CTL0 = ADC10ON + SREF_1 + REFON; // ADC10ON, vr+ = Vref+f, Vr- = Vss, reference on, ref 1
+                    ADC10CTL1 = INCH_10 + ADC10SSEL_1;    // temp sensor, clock = ACLK
+                    ADC10AE0 |= BIT1;                     // PA.1 ADC option select
 
-                //set up a timer for stabilisation, use A1
-                //need a 30microsecond delay calculation time was 0.49, putting 10 to test, need only 1 timer
-                int counts[1] = {10};
-                t_activated = activate_free_timer(1, counts);
-                activated_temp[0] = activated_timers[0];      //record which ones were activated
-                thermometer = activated_temp[0];              //Set for proper check in interrupts
-                if (t_activated != 1) { //if return is 1, has now been activated
-                    //something went wrong
-                    //for testing
-                    P1OUT ^= BIT6;
-                }
-            }
-
-            if (sample_temp){
-                ADC10CTL0 |= SREF_1;                //Set ref to 1
-                ADC10CTL1 |= INCH_10;                //Ensure right channel
-                ADC10CTL0 |= ENC + ADC10SC;         // Sampling and conversion start
-                ADC10AE0 |= BIT1;                          // PA.1 ADC option select
-                //based on code for pot above
-                //ADC10MEM = conversion result
-                while ((ADC10CTL1 & ADC10BUSY) == 1) {//check if busy
-                    //Wait for sample to take place
-                }
-                temp = ADC10MEM;           //Just to make sure the value doesn't change during checking
-                //reset ENC
-                ADC10CTL0 &= ~ENC;
-                value_temp = ((temp - 673) * 423) / 1024;
-
-                if(value_temp != orig_temp){ //if value has changed
-                    //check by how much
-                    change_t = abs(orig_temp - value_temp);
-
-                    if (change_t >= step_size_t){
-                        //send message
-                        //change to new orig value
-                        orig_temp = value_temp;
-                        //testing light
-                        P1OUT ^= BIT0;
+                    //set up a timer for stabilisation, use A1
+                    //need a 30microsecond delay calculation time was 0.49, putting 10 to test, need only 1 timer
+                    int counts[1] = {10};
+                    t_activated = activate_free_timer(1, counts);
+                    activated_temp[0] = activated_timers[0];      //record which ones were activated
+                    thermometer = activated_temp[0];              //Set for proper check in interrupts
+                    if (t_activated != 1) { //if return is 1, has now been activated
+                        //something went wrong
+                        send_message = 1;
+                        send[0][0] = 1; //set flag
+                        send[1][0] = 1; //generic
+                        //disable temp
+                        thermometer = -1;
                     }
                 }
 
-                //set sample to false
-                sample_temp = 0;
+                if (sample_temp){
+                    //TODO: remove comments to test with pot
+                    //ADC10CTL0 = SREF_1
+                    //ADC10CTL1 = INCH_10
+                    //ADC10AE0 |= BIT1;
+                    ADC10CTL0 |= ENC + ADC10SC;         // Sampling and conversion start
+                    //based on code for pot above
+                    //ADC10MEM = conversion result
+                    while ((ADC10CTL1 & ADC10BUSY) == 1) {//check if busy
+                        //Wait for sample to take place
+                    }
+                    temp = ADC10MEM;           //Just to make sure the value doesn't change during checking
+                    //reset ENC
+                    ADC10CTL0 &= ~ENC;
+                    value_temp = ((temp - 673) * 423) / 1024;
+
+                    if(value_temp != orig_temp){ //if value has changed
+                        //check by how much
+                        change_t = abs(orig_temp - value_temp);
+
+                        if (change_t >= step_size_t){
+                            //send message
+                            send_message = 1;
+                            send[0][4] = 1; //set flag
+                            send[1][4] = value_temp; //temp value
+                            //change to new orig value
+                            orig_temp = value_temp;
+                            //testing light
+                            P1OUT ^= BIT0;
+                        }
+                    }
+
+                    //set sample to false
+                    sample_temp = 0;
+                }
             }
 
-
-        } else if(thermometer == -2){
+        } else if(thermometer == -1){
             t_activated = 0;
             deactivate_timer(activated_temp, 1);
-            thermometer = -1;
+            thermometer = 0;
         }
 
 
         //Outputs
+        //TODO: add checks for clashes
         //LED1
         //on/off
         if(led1_on == 1){
@@ -378,7 +547,7 @@ int main(void)
         }
 
         //blinking
-        if(led1_blink > -1){
+        if(led1_blink > 0){
             if(!led1_active){
                 P1DIR |= BIT0;
                 //need a timer for the blinking, only 1
@@ -388,22 +557,26 @@ int main(void)
                 led1_blink = activated_led1[0];
                 if (led1_active != 1) { //if return is 1, has now been activated
                     //something went wrong
-                    //for testing
-                    P1OUT ^= BIT6;
+                    //send generic error message
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable the led
+                    led1_blink = -1;
                 }
                 //toggle LED D1
                 P1OUT ^= BIT0;
             }
 
-        } else if (led1_blink == -2){
+        } else if (led1_blink == -1){
             led1_active = 0;
             P1OUT &= ~BIT0;
             deactivate_timer(activated_led1, 1);
-            led1_blink = -1;
+            led1_blink = 0;
         }
 
         //fade in
-        if(led1_fade_in > -1){
+        if(led1_fade_in > 0){
             if(!led1_active){
                 P1DIR |= BIT0;
                 P1OUT &= ~BIT0; //don't want it on
@@ -415,20 +588,27 @@ int main(void)
                 led1_fade_in = get_timer_code(activated_led1);
                 if (led1_active == 0) { //if return is anything but 0, has now been activated
                     //something went wrong
-                    //for testing
-                    P1OUT ^= BIT6;
+                    //send generic error message
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable the fade in
+                    led1_fade_in = -1;
+                } else {
+                    light_flag_1 = 0; //reset this
+                    counter_val_1 = 0; //and this
                 }
 
             }
 
-        } else if (led1_fade_in == -2){
+        } else if (led1_fade_in == -1){
             //led1_active = 0; - light is still active
             deactivate_timer(activated_led1, 2);
-            led1_fade_in = -1;
+            led1_fade_in = 0;
         }
 
         //fade out
-        if(led1_fade_out > -1){
+        if(led1_fade_out > 0){
             if(!led1_fo_active){ //if light hasn't been activated, or if on
                 P1DIR |= BIT0;
                 //need 2 timers for the fading in
@@ -439,30 +619,34 @@ int main(void)
                 led1_fade_out = get_timer_code(activated_led1);
                 if (led1_fo_active == 0) { //if return is anything but 0, has now been activated
                     //something went wrong
-                    //for testing
-                    P1OUT ^= BIT6;
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable the fade out
+                    led1_fade_out = -1;
                 } else {
                     led1_active = 1; //led is being used
+
+                    //set the brightness to max
+                    brightness_1 = max_brightness;
+                    light_flag_1 = 1;
+                    counter_val_1 = 0; //reset this
+                    //need to turn on a light first, if not already on
+                    P1OUT |= BIT0;
                 }
-                //for testing
-                //P1OUT ^= BIT6;
-                //set the brightness to max
-                brightness_1 = max_brightness;
-                light_flag_1 = 1;
-                //need to turn on a light first, if not already on
-                P1OUT |= BIT0;
+
             }
 
-        } else if (led1_fade_out == -2){
+        } else if (led1_fade_out == -1){
             led1_fo_active = 0;
             led1_active = 0;
             P1OUT &= ~BIT0;
             deactivate_timer(activated_led1, 2);
-            led1_fade_out = -1;
+            led1_fade_out = 0;
         }
 
         //breathing
-        if(led1_breath > -1){
+        if(led1_breath > 0){
             if(!led1_active){
                 P1DIR |= BIT0;
                 //need 2 timers for the breathing light
@@ -473,16 +657,23 @@ int main(void)
                 led1_breath = get_timer_code(activated_led1);
                 if (led1_active == 0) { //if return is anything but 0, has now been activated
                     //something went wrong
-                    //for testing
-                    P1OUT ^= BIT6;
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable the breathing light
+                    led1_breath = -1;
+                } else {
+                     light_flag_1 = 0;       //ensure increasing brightness first
+                     counter_val_1 = 0;      //and counter val 0
                 }
+
             }
 
-        } else if (led1_breath == -2){
+        } else if (led1_breath == -1){
             led1_active = 0;
             P1OUT &= ~BIT0;
             deactivate_timer(activated_led1, 2);
-            led1_breath = -1;
+            led1_breath = 0;
         }
 
         //LED2 on/off
@@ -501,7 +692,7 @@ int main(void)
         }
 
         //blinking
-        if(led2_blink > -1){
+        if(led2_blink > 0){
             if(!led2_active){
                 P1DIR |= BIT6;
                 //need a timer for the blinking, only 1
@@ -511,22 +702,25 @@ int main(void)
                 led2_blink = activated_led2[0];
                 if (led2_active != 1) { //if return is 1, has now been activated
                     //something went wrong
-                    //for testing
-                    P1OUT ^= BIT6;
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable the blinking light
+                    led2_blink = -1;
                 }
                 //toggle LED D2
                 P1OUT ^= BIT6;
             }
 
-        } else if (led2_blink == -2){
+        } else if (led2_blink == -1){
             led2_active = 0;
             P1OUT &= ~ BIT6;
             deactivate_timer(activated_led2, 1);
-            led2_blink = -1;
+            led2_blink = 0;
         }
 
         //fade in
-        if(led2_fade_in > -1){
+        if(led2_fade_in > 0){
             if(!led2_active){
                 P1DIR |= BIT6;
                 P1OUT &= ~BIT6; //don't want it on
@@ -538,18 +732,27 @@ int main(void)
                 led2_fade_in = get_timer_code(activated_led2);
                 if (led2_active == 0) { //if return is anything but 0, has now been activated
                     //something went wrong
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable the fade in
+                    led2_fade_in = -1;
+                } else {
+                    light_flag_2 = 0; //reset light flag
+                    counter_val_2 = 0;
                 }
+
             }
 
-        } else if (led2_fade_in == -2){
+        } else if (led2_fade_in == -1){
             //led2_active = 0; - light is still active
             //P1OUT &= ~BIT6;
             deactivate_timer(activated_led2, 2);
-            led2_fade_in = -1;
+            led2_fade_in = 0;
         }
 
         //fade out
-        if(led2_fade_out > -1){
+        if(led2_fade_out > 0){
             if(!led2_fo_active){ //if light hasn't been activated, or if on
                 P1DIR |= BIT6;
                 //need 2 timers for the fading in
@@ -559,29 +762,36 @@ int main(void)
                 activated_led2[1] = activated_timers[1]; //record second one
                 led2_fade_out = get_timer_code(activated_led2);
                 if (led2_fo_active == 0) { //if return is anything but 0, has now been activated
-                    //something went wrong
+                    //something went wrong'=
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable the fade out
+                    led2_fade_out = -1;
                 } else {
                     led2_active = 1; //led is being used
+                    //for testing
+                    //P1OUT ^= BIT6;
+                    //set the brightness to max
+                    brightness_2 = max_brightness;
+                    light_flag_2 = 1;
+                    counter_val_2 = 0;
+                    //need to turn on a light first, if not already on
+                    P1OUT |= BIT6;
                 }
-                //for testing
-                //P1OUT ^= BIT6;
-                //set the brightness to max
-                brightness_2 = max_brightness;
-                light_flag_2 = 1;
-                //need to turn on a light first, if not already on
-                P1OUT |= BIT6;
+
             }
 
-        } else if (led2_fade_out == -2){
+        } else if (led2_fade_out == -1){
             led2_fo_active = 0;
             led2_active = 0;
             P1OUT &= ~BIT6;
             deactivate_timer(activated_led2, 2);
-            led2_fade_out = -1;
+            led2_fade_out = 0;
         }
 
         //breathing
-        if(led2_breath > -1){
+        if(led2_breath > 0){
             if(!led2_active){
                 P1DIR |= BIT6;
                 //need 2 timers for the breathing light
@@ -592,14 +802,23 @@ int main(void)
                 led2_breath = get_timer_code(activated_led2);
                 if (led2_active == 0) { //if return is anything but 0, has now been activated
                     //something went wrong
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable the breathing light
+                    led2_breath = -1;
+                } else {
+                    light_flag_2 = 0;
+                    counter_val_2 = 0;
                 }
+
             }
 
-        } else if (led2_breath == -2){
+        } else if (led2_breath == -1){
             led2_active = 0;
             P1OUT &= ~BIT6;
             deactivate_timer(activated_led2, 2);
-            led2_breath = -1;
+            led2_breath = 0;
         }
 
         //LED3 on/off
@@ -619,7 +838,7 @@ int main(void)
         }
 
         //circling
-        if(led3_rot > -1){
+        if(led3_rot > 0){
             if(!led3_active){
                 P2DIR |= BIT1 + BIT3 + BIT5;
                 //need a timer for the rotation speed, only 1
@@ -629,23 +848,27 @@ int main(void)
                 led3_rot = activated_led3[0];
                 if (led3_active != 1) { //if return is 1, has now been activated
                     //something went wrong
-                    //for testing
-                    P1OUT ^= BIT6;
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable the rotation light
+                    led3_rot = -1;
+                } else {
+                    //toggle LED D3, wanted colour
+                    P2OUT = colours[colour];
                 }
-                //toggle LED D3, wanted colour
-                P2OUT = colours[colour];
             }
 
-        } else if(led3_rot == -2){
+        } else if(led3_rot == -1){
             led3_active = 0;
             P2OUT &= ~(BIT1 + BIT3 + BIT5);     //turn light off
             deactivate_timer(activated_led3, 1);
-            led3_rot = -1;
+            led3_rot = 0;
 
         }
 
         //blinking
-        if(led3_blink > -1){
+        if(led3_blink > 0){
             if(!led3_active){
                 P2DIR |= BIT1 + BIT3 + BIT5;
                 //need a timer for the rotation speed, only 1
@@ -655,24 +878,29 @@ int main(void)
                 led3_blink = activated_led3[0];
                 if (led3_active != 1) { //if return is 1, has now been activated
                     //something went wrong
-                    //for testing
-                    P1OUT ^= BIT6;
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable the blinking light
+                    led3_blink = -1;
+                } else {
+                    //toggle LED D3, with start colour
+                    P2OUT = colours[colour];
+                    //indicate on
+                    led3_blink_on = 1;
                 }
-                //toggle LED D3, with start colour
-                P2OUT = colours[colour];
-                //indicate on
-                led3_blink_on = 1;
+
             }
 
-        } else if(led3_blink == -2){
+        } else if(led3_blink == -1){
             led3_active = 0;
             P2OUT &= ~(BIT1 + BIT3 + BIT5);     //turn light off
             deactivate_timer(activated_led3, 1);
-            led3_blink = -1;
+            led3_blink = 0;
         }
 
         //fade in
-        if(led3_fade_in > -1){
+        if(led3_fade_in > 0){
             if(!led3_active){
                 P2DIR |= BIT1 + BIT3 + BIT5;
                 P2OUT &= ~(BIT1 + BIT3 + BIT5); //don't want it on
@@ -684,18 +912,24 @@ int main(void)
                 led3_fade_in = get_timer_code(activated_led3);
                 if (led3_active == 0) { //if return is anything but 0, has now been activated
                     //something went wrong
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable fade in
+                    led3_fade_in = -1;
+                } else {
+                    light_flag_3 = 0;
+                    counter_val_3 = 0;
                 }
             }
 
-        } else if (led3_fade_in == -2){
-            //led3_active = 0;
-            //P2OUT &= ~(BIT1 + BIT3 + BIT5);
+        } else if (led3_fade_in == -1){
             deactivate_timer(activated_led3, 2);
-            led3_fade_in = -1;
+            led3_fade_in = 0;
         }
 
         //fade out
-        if(led3_fade_out > -1){
+        if(led3_fade_out > 0){
             if(!led3_fo_active){ //if light hasn't been activated, or if on
                 P2DIR |= BIT1 + BIT3 + BIT5;
                 //need 2 timers for the fading in
@@ -706,28 +940,35 @@ int main(void)
                 led3_fade_out = get_timer_code(activated_led3);
                 if (led3_fo_active == 0) { //if return is anything but 0, has now been activated
                     //something went wrong
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable fade out
+                    led3_fade_out = -1;
                 } else {
                     led3_active = 1; //led is being used
+                    //for testing
+                    //P1OUT ^= BIT6;
+                    //set the brightness to max
+                    brightness_3 = max_brightness;
+                    light_flag_3 = 1;
+                    counter_val_3 = 0;
+                    //need to turn on a light first, if not already on, on the specified colour
+                    P2OUT |= colours[colour];
                 }
-                //for testing
-                //P1OUT ^= BIT6;
-                //set the brightness to max
-                brightness_3 = max_brightness;
-                light_flag_3 = 1;
-                //need to turn on a light first, if not already on, on the specified colour
-                P2OUT |= colours[colour];
+
             }
 
-        } else if (led3_fade_out == -2){
+        } else if (led3_fade_out == -1){
             led3_fo_active = 0;
             led3_active = 0;
             P2OUT &= ~(BIT1 + BIT3 + BIT5);
             deactivate_timer(activated_led3, 2);
-            led3_fade_out = -1;
+            led3_fade_out = 0;
         }
 
         //breathing
-        if(led3_breath > -1){
+        if(led3_breath > 0){
             if(!led3_active){
                 P2DIR |= BIT1 + BIT3 + BIT5;
                 //need 2 timers for the breathing light
@@ -738,18 +979,26 @@ int main(void)
                 led3_breath = get_timer_code(activated_led3);
                 if (led3_active == 0) { //if return is anything but 0, has now been activated
                     //something went wrong
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable the breathing light
+                    led3_breath = -1;
+                } else {
+                    light_flag_3 = 0;
+                    counter_val_3 = 0;
                 }
             }
 
-        } else if (led3_breath == -2){
+        } else if (led3_breath == -1){
             led3_active = 0;
             P2OUT &= ~(BIT1 + BIT3 + BIT5); //turn off the light
             deactivate_timer(activated_led3, 2);
-            led3_breath = -1;
+            led3_breath = 0;
         }
 
         //Buzzer for specified duration
-        if(buzzer_tone > -1){
+        if(buzzer_tone > 0){
             if(!buzzer_active){ //if it's not been activated
                 //activate the pins used
                 P2DIR |= BIT2 + BIT4;
@@ -764,25 +1013,30 @@ int main(void)
                 buzzer_tone = activated_buzzer[0]; //get the timer
                 if (buzzer_active == 0) { //if return is anything but 0, has now been activated
                     //something went wrong
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable the buzzer
+                    buzzer_tone = -1;
                 }
             }
-        } else if (buzzer_tone == -2){
+        } else if (buzzer_tone == -1){
             buzzer_active = 0;  //no longer on
             P2OUT &= ~BIT2;
             P2OUT &= ~BIT4;
             deactivate_timer(activated_buzzer, 1);
-            buzzer_tone = -1;
+            buzzer_tone = 0;
         }
 
         //Buzzer beeping
-        if(buzzer_beep > -1){
+        if(buzzer_beep > 0){
             if(!buzzer_active){ //if it's not been activated
                 //activate the pins used
                 P2DIR |= BIT2 + BIT4;
                 P2OUT |= BIT2;     //ensure one is on, the other off
                 P2OUT &= ~ BIT4;
                 buzzer_count = 0;   //ensure this is at 0;
-                buzzer_duration = 400; //ensure duration is proper
+                buzzer_duration = buzzer_duration/5; //ensure duration is proper
                 buzzer_duration_off = buzzer_duration_off/5; //ensure duration is proper
                 //need to have 1 timer
                 int counts[1] = {buzzer_period};
@@ -791,249 +1045,40 @@ int main(void)
                 buzzer_beep = activated_buzzer[0];
                 if (buzzer_active == 0) { //if return is anything but 0, has now been activated
                     //something went wrong
+                    send_message = 1;
+                    send[0][0] = 1; //set flag
+                    send[1][0] = 1; //generic
+                    //disable the buzzer
+                    buzzer_beep = -1;
                 }
             }
 
-        } else if (buzzer_beep == -2){
+        } else if (buzzer_beep == -1){
             buzzer_active = 0;  //no longer on
             P2OUT &= ~BIT2;
             P2OUT &= ~BIT4;
             deactivate_timer(activated_buzzer, 1);
-            buzzer_beep= -1;
+            buzzer_beep= 0;
         }
 
     }
 }
 
-//interrupts, duplicated code to allow for the optimum timer usage
-//timer A0
+/**interrupts,
+ * duplicated code to allow for optimum timer usage
+ *
+ * timer A0 is reserved for UART
+ */
+
 #pragma vector=TIMER0_A0_VECTOR
 __interrupt void Timer0_A0 (void)
 {
-    //check for how long button was pressed
-    if ((button == 0) && (held == 1)) {
-        if ((held == 1) && !(P1IN & BIT3)) { //check how long its being held for
-            timerCount += 1;
-
-        } else if ((held == 1) && (P1IN & BIT3)){   //if button was released
-            //send timer count signal here
-            //led1_fade_out = 1;
-            //testing with light first
-            //P1OUT ^= BIT6;
-            buzzer_beep = -2;
-            held = 0;                               //button has now been released
-        }
-        //offset TA0CCR0 by the count number/period
-        TA0CCR0 += count_b;
-    } else if (button == 0){ //check that it is the button debouncing
-        if ((pressed == 1) && !(P1IN & BIT3)){   //button was pressed properly
-             timerCount = 0;                     //Reset the timer count
-             pressed = 0;                        //reset pressed
-             held = 1;                           //Button is being held
-             //P1OUT ^= BIT6;
-             //offset TA0CCR0 by the count number/period
-             //change the value held in the array
-             timers_used[0] = count_b;
-             TA0CCR0 += count_b;
-
-        } else {
-            pressed = 0;                         //Button is not being pressed
-        }
-
-     }
-
-    //button 2, copied code
-    if ((button2 == 0) && (held2 == 1)) {
-        if ((held2 == 1) && !(P1IN & BIT5)) { //check how long its being held for
-            timerCount2 += 1;
-
-        } else if ((held2 == 1) && (P1IN & BIT5)){   //if button was released
-            //send timer count signal here
-            //testing with light first
-            //P1OUT ^= BIT0;
-            held2 = 0;                               //button has now been released
-        }
-        //offset TA0CCR0 by the count number/period
-        TA0CCR0 += count_b2;
-    } else if (button2 == 0){ //check that it is the button debouncing
-        if ((pressed2 == 1) && !(P1IN & BIT5)){   //button was pressed properly
-             timerCount2 = 0;                     //Reset the timer count
-             pressed2 = 0;                        //reset pressed
-             held2 = 1;                           //Button is being held
-             //P1OUT ^= BIT6;
-
-             //change the value held in the array
-             timers_used[0] = count_b2;
-             TA0CCR0 += count_b2;
-
-        } else {
-            pressed2 = 0;                         //Button is not being pressed
-        }
-
-     }
-
-    //thermometer stuff
-    if(thermometer == 0){
-        if (!stable){
-            stable = 1;
-            //get original value, if possible here
-            ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
-            temp = ADC10MEM;
-            // oC = ((A10/1024)*1500mV)-986mV)*1/3.55mV = A10*423/1024 - 278, taken from example
-            orig_temp = ((temp - 673) * 423) / 1024;
-            timers_used[0] = sample_temp_time;
-            TA0CCR0 += sample_temp_time;
-
-        } else {
-            sample_temp = 1;        //start a sample
-        }
-
-        TA0CCR0 += sample_temp_time;
-    }
-
-    //outputs
-    //LED1 blinking
-    if(led1_blink == 0){
-        P1OUT ^= BIT0;
-        TA0CCR0 += blink_rate_1;
-    }
-
-    //fading in/out and breathing, part 1, can be 10, 11, 12, 13, 14
-    if(((led1_fade_in >= 10) && (led1_fade_in <= 14)) || ((led1_fade_out >= 10) && (led1_fade_out <= 14)) || ((led1_breath >= 10) && (led1_breath <= 14))){
-        if(counter_val_1 < brightness_1){
-            P1OUT |= BIT0;                              //Turn on light
-        } else {
-            P1OUT &= ~BIT0;
-        }
-        counter_val_1 += 1;                             //Increment the value to read from the array
-
-        if(counter_val_1 >= max_brightness){                       //reached max value, reset
-            counter_val_1 = 0;
-        }
-        TA0CCR0 += change_period;
-    }
-
-    //LED2 blinking
-    if(led2_blink == 0){
-        P1OUT ^= BIT6;
-        TA0CCR0 += blink_rate_2;
-    }
-
-    //fading in/out and breathing, part 1, can be 10, 11, 12, 13, 14
-    if(((led2_fade_in >= 10) && (led2_fade_in <= 14)) || ((led2_fade_out >= 10) && (led2_fade_out <= 14)) || ((led2_breath >= 10) && (led2_breath <= 14))){
-        if(counter_val_2 < brightness_2){
-            P1OUT |= BIT6;                              //Turn on light
-        } else {
-            P1OUT &= ~BIT6;
-        }
-        counter_val_2 += 1;                             //Increment the value to read from the array
-
-        if(counter_val_2 >= max_brightness){                       //reached max value, reset
-            counter_val_2 = 0;
-        }
-        TA0CCR0 += change_period;
-    }
-
-    //LED3 rotating
-    if(led3_rot == 0){
-        //verify boundaries
-        if ((colour == 0) && (led3_dir == -1)){
-            colour = 6;
-        } else if ((colour == 6) && (led3_dir == 1)){
-            colour = 0;
-        } else {
-            colour = colour + led3_dir; //change colour based on direction
-        }
-        //swap colour
-        P2OUT = colours[colour];
-        TA0CCR0 += blink_rate_3;
-    }
-    //LED3 blink
-    if(led3_blink == 0){
-        if(led3_blink_on){
-            P2OUT &= ~(BIT1 + BIT3 + BIT5);     //turn light off
-            led3_blink_on = 0;
-            TA0CCR0 += blink_rate_3;
-        } else {
-            if ((colour == 0) && (led3_dir == -1)){
-                colour = 6;
-            } else if ((colour == 6) && (led3_dir == 1)){
-                colour = 0;
-            } else {
-                colour = colour + led3_dir; //change colour based on direction
-            }
-            led3_blink_on = 1;
-            //swap colour
-            P2OUT = colours[colour];
-            TA0CCR0 += blink_rate_3;
-        }
-    }
-
-    //fading in/out and breathing, part 1, can be 10, 11, 12, 13, 14
-    if(((led3_fade_in >= 10) && (led3_fade_in <= 14)) || ((led3_fade_out >= 10) && (led3_fade_out <= 14)) || ((led3_breath >= 10) && (led3_breath <= 14))){
-        if(counter_val_3 < brightness_3){
-            P2OUT |= colours[colour];                              //Turn on light
-        } else {
-            P2OUT &= ~(BIT1 + BIT3 + BIT5);
-        }
-        counter_val_3 += 1;                             //Increment the value to read from the array
-
-        if(counter_val_3 >= max_brightness){                       //reached max value, reset
-            counter_val_3 = 0;
-        }
-        TA0CCR0 += change_period;
-    }
-
-    //Buzzer, tone for specific duration
-    if(buzzer_tone == 0){
-        buzzer_count += 1;  //increment count
-        //alternate the pins
-        P2OUT ^= BIT2;
-        P2OUT ^= BIT4;
-
-        //check if less or greater than the wanted duration
-        if(buzzer_count >= buzzer_duration){
-            buzzer_tone = -2; //turn it off
-        }
-
-        TA0CCR0 += buzzer_period;
-    }
-
-    //buzzer beeping
-    if(buzzer_beep == 0){
-        buzzer_count += 1;  //increment count
-
-        if(buzzer_on) { //if it is on, alternate
-            //alternate the pins
-            P2OUT ^= BIT2;
-            P2OUT ^= BIT4;
-            //check if less or greater than the wanted duration
-            if(buzzer_count >= buzzer_duration){
-                buzzer_on = 0; //turn off
-                buzzer_count = 0; //reset count
-            }
-
-        } else { //if off, turn both off
-            P2OUT &= ~BIT2;
-            P2OUT &= ~BIT4;
-
-            //check if less or greater than the wanted duration
-            if(buzzer_count >= buzzer_duration_off){
-                buzzer_on= 1; //turn it on
-                //buzzer count reset
-                buzzer_count = 0;
-                //turn one of them on
-                P2OUT |= BIT2;
-            }
-
-        }
-
-
-        TA0CCR0 += buzzer_period;
-    }
+    //TODO: insert uart code here
+    //UART stuff here, generic timer nr for now
+    TA0CCR0 += 16384;
 }
 
-//interrupt for timer A0
+//interrupt for timer A0_1,2 and overflow
 #pragma vector=TIMER0_A1_VECTOR
 __interrupt void Timer0_A1(void){
     switch(TA0IV)
@@ -1042,20 +1087,26 @@ __interrupt void Timer0_A1(void){
         //check for how long button was pressed
         if ((button == 1) && (held == 1)) {
             if ((held == 1) && !(P1IN & BIT3)) { //check how long its being held for
-                timerCount += 1;
-
+                timer_count += 1;
+                //offset TA0CCR1 by the count number/period
+                TA0CCR1 += count_b;
             } else if ((held == 1) && (P1IN & BIT3)){   //if button was released
-                //send timer count signal here
+                //send message for how long the button was held for
+                send_message = 1;
+                send[0][1] = 1; //set flag
+                send[1][1] = timer_count; //the time held
+
                 led3_rot = 1;
                 //testing with light first
                // P1OUT ^= BIT0;
                 held = 0;                               //button has now been released
+                //set timer count to 0
+                TA0CCR1 = 0;
             }
-            //offset TA0CCR1 by the count number/period
-            TA0CCR1 += count_b;
+
         } else if (button == 1){ //check that it is the button debouncing
             if ((pressed == 1) && !(P1IN & BIT3)){   //button was pressed properly
-                 timerCount = 0;                     //Reset the timer count
+                 timer_count = 0;                     //Reset the timer count
                  pressed = 0;                        //reset pressed
                  held = 1;                           //Button is being held
                  P1OUT ^= BIT6;
@@ -1073,19 +1124,24 @@ __interrupt void Timer0_A1(void){
         //button 2, copied code
         if ((button2 == 1) && (held2 == 1)) {
             if ((held2 == 1) && !(P1IN & BIT5)) { //check how long its being held for
-                timerCount2 += 1;
-
+                timer_count2 += 1;
+                //offset TA0CCR1 by the count number/period
+                TA0CCR1 += count_b2;
             } else if ((held2 == 1) && (P1IN & BIT5)){   //if button was released
-                //send timer count signal here
+                //send message for how long the button was held for
+                send_message = 1;
+                send[0][1] = 1; //set flag
+                send[1][1] = timer_count2; //the time held
                 //testing with light first
-                P1OUT ^= BIT0;
+                //P1OUT ^= BIT0;
+                buzzer_beep = -1;
                 held2 = 0;                               //button has now been released
+                TA0CCR1 = 0;
             }
-            //offset TA0CCR1 by the count number/period
-            TA0CCR1 += count_b2;
+
         } else if (button2 == 1){ //check that it is the button debouncing
             if ((pressed2 == 1) && !(P1IN & BIT5)){   //button was pressed properly
-                 timerCount2 = 0;                     //Reset the timer count
+                 timer_count2 = 0;                     //Reset the timer count
                  pressed2 = 0;                        //reset pressed
                  held2 = 1;                           //Button is being held
                  P1OUT ^= BIT0;
@@ -1148,7 +1204,7 @@ __interrupt void Timer0_A1(void){
 
             if(brightness_1 == max_brightness){               //if max brightness
                 P1OUT |= BIT0;             //leave it on
-                led1_fade_in = -2;          //completed task
+                led1_fade_in = -1;          //completed task
             }
 
             TA0CCR1 += period_1;
@@ -1162,7 +1218,7 @@ __interrupt void Timer0_A1(void){
 
              if (brightness_1 == 0) {       //reached lowest value
                 P1OUT &= ~BIT0;                 //keep light off
-                led1_fade_out = -2;          //completed task, deactivate it
+                led1_fade_out = -1;          //completed task, deactivate it
             }
 
             TA0CCR1 += period_1;
@@ -1228,7 +1284,7 @@ __interrupt void Timer0_A1(void){
 
              if (brightness_2 == 0) {       //reached lowest value
                 P1OUT &= ~BIT6;                 //keep light off
-                led2_fade_out = -2;          //completed task, deactivate it
+                led2_fade_out = -1;          //completed task, deactivate it
             }
 
             TA0CCR1 += period_2;
@@ -1323,7 +1379,7 @@ __interrupt void Timer0_A1(void){
 
              if (brightness_3 == 0) {       //reached lowest value
                 P2OUT &= ~(BIT1 + BIT3 + BIT5);                 //keep light off
-                led3_fade_out = -2;          //completed task, deactivate it
+                led3_fade_out = -1;          //completed task, deactivate it
             }
 
             TA0CCR1 += period_3;
@@ -1364,7 +1420,7 @@ __interrupt void Timer0_A1(void){
 
             //check if less or greater than the wanted duration
             if(buzzer_count >= buzzer_duration){
-                buzzer_tone = -2; //turn it off
+                buzzer_tone = -1; //turn it off
             }
 
             TA0CCR1 += buzzer_period;
@@ -1408,24 +1464,28 @@ __interrupt void Timer0_A1(void){
         //check for how long button was pressed
         if ((button == 2) && (held == 1)) {
             if ((held == 1) && !(P1IN & BIT3)) { //check how long its being held for
-                timerCount += 1;
-
+                timer_count += 1;
+                //offset TA0CCR0 by the count number/period
+                TA0CCR2 += count_b;
             } else if ((held == 1) && (P1IN & BIT3)){   //if button was released
-                //send timer count signal here
+                //send message for how long the button was held for
+                send_message = 1;
+                send[0][1] = 1; //set flag
+                send[1][1] = timer_count; //the time held
+
                 led3_rot = 1;
                 //testing with light first
                // P1OUT ^= BIT0;
                 held = 0;                               //button has now been released
+                TA0CCR2 = 0;
             }
-            //offset TA0CCR0 by the count number/period
-            TA0CCR2 += count_b;
+
         } else if (button == 2){ //check that it is the button debouncing
             if ((pressed == 1) && !(P1IN & BIT3)){   //button was pressed properly
-                 timerCount = 0;                     //Reset the timer count
+                 timer_count = 0;                     //Reset the timer count
                  pressed = 0;                        //reset pressed
                  held = 1;                           //Button is being held
-                 P1OUT ^= BIT6;
-                 //offset TA0CCR0 by the count number/period
+
                  //change the value held in the array
                  timers_used[0] = count_b;
                  TA0CCR2 += count_b;
@@ -1439,18 +1499,22 @@ __interrupt void Timer0_A1(void){
         //button 2, copied code
         if ((button2 == 2) && (held2 == 1)) {
             if ((held2 == 1) && !(P1IN & BIT5)) { //check how long its being held for
-                timerCount2 += 1;
-
+                timer_count2 += 1;
+                //offset TA0CCR0 by the count number/period
+                TA0CCR2 += count_b2;
             } else if ((held2 == 1) && (P1IN & BIT5)){   //if button was released
                 //send timer count signal here
+                send_message = 1;
+                send[0][1] = 1; //set flag
+                send[1][1] = timer_count2; //the time held
 
                 held2 = 0;                               //button has now been released
+                TA0CCR2 = 0;
             }
-            //offset TA0CCR0 by the count number/period
-            TA0CCR2 += count_b2;
+
         } else if (button2 == 2){ //check that it is the button debouncing
             if ((pressed2 == 1) && !(P1IN & BIT5)){   //button was pressed properly
-                 timerCount2 = 0;                     //Reset the timer count
+                 timer_count2 = 0;                     //Reset the timer count
                  pressed2 = 0;                        //reset pressed
                  held2 = 1;                           //Button is being held
 
@@ -1479,7 +1543,7 @@ __interrupt void Timer0_A1(void){
                 sample_temp = 1;        //start a sample
             }
 
-            //TA0CCR2 += sample_temp_time;
+            TA0CCR2 += sample_temp_time;
         }
 
         //outputs
@@ -1526,7 +1590,7 @@ __interrupt void Timer0_A1(void){
 
              if (brightness_1 == 0) {       //reached lowest value
                 P1OUT &= ~BIT0;                 //keep light off
-                led1_fade_out = -2;          //completed task, deactivate it
+                led1_fade_out = -1;          //completed task, deactivate it
             }
 
             TA0CCR2 += period_1;
@@ -1592,7 +1656,7 @@ __interrupt void Timer0_A1(void){
 
              if(brightness_2 == 0) {       //reached lowest value
                 P1OUT &= ~BIT6;                 //keep light off
-                led2_fade_out = -2;          //completed task, deactivate it
+                led2_fade_out = -1;          //completed task, deactivate it
             }
 
             TA0CCR2 += period_2;
@@ -1687,7 +1751,7 @@ __interrupt void Timer0_A1(void){
 
              if(brightness_3 == 0) {       //reached lowest value
                 P2OUT &= ~(BIT1 + BIT3 + BIT5);    //keep light off
-                led3_fade_out = -2;          //completed task, deactivate it
+                led3_fade_out = -1;          //completed task, deactivate it
             }
 
             TA0CCR2 += period_3;
@@ -1728,7 +1792,7 @@ __interrupt void Timer0_A1(void){
 
             //check if less or greater than the wanted duration
             if(buzzer_count >= buzzer_duration){
-                buzzer_tone = -2; //turn it off
+                buzzer_tone = -1; //turn it off
             }
 
             TA0CCR2 += buzzer_period;
@@ -1783,20 +1847,24 @@ __interrupt void Timer1_A0 (void)
     //check for how long button was pressed
     if ((button == 3) && (held == 1)) {
         if ((held == 1) && !(P1IN & BIT3)) { //check how long its being held for
-            timerCount += 1;
-
+            timer_count += 1;
+            //offset TA0CCR0 by the count number/period
+            TA1CCR0 += count_b;
         } else if ((held == 1) && (P1IN & BIT3)){   //if button was released
-            //send timer count signal here
+            send_message = 1;
+            send[0][1] = 1; //set flag
+            send[1][1] = timer_count; //the time held
+
             led1_blink = 1;
             //testing with light first
            // P1OUT ^= BIT0;
             held = 0;                               //button has now been released
+            TA1CCR0 = 0;
         }
-        //offset TA0CCR0 by the count number/period
-        TA1CCR0 += count_b;
+
     } else if (button == 3){ //check that it is the button debouncing
         if ((pressed == 1) && !(P1IN & BIT3)){   //button was pressed properly
-             timerCount = 0;                     //Reset the timer count
+             timer_count = 0;                     //Reset the timer count
              pressed = 0;                        //reset pressed
              held = 1;                           //Button is being held
              P1OUT ^= BIT6;
@@ -1814,18 +1882,22 @@ __interrupt void Timer1_A0 (void)
     //button 2, copied code
     if ((button2 == 3) && (held2 == 1)) {
         if ((held2 == 1) && !(P1IN & BIT5)) { //check how long its being held for
-            timerCount2 += 1;
-
+            timer_count2 += 1;
+            //offset TA0CCR0 by the count number/period
+            TA1CCR0 += count_b2;
         } else if ((held2 == 1) && (P1IN & BIT5)){   //if button was released
             //send timer count signal here
+            send_message = 1;
+            send[0][1] = 1; //set flag
+            send[1][1] = timer_count2; //the time held
 
             held2 = 0;                               //button has now been released
+            TA1CCR0 = 0;
         }
-        //offset TA0CCR0 by the count number/period
-        TA1CCR0 += count_b2;
+
     } else if (button2 == 3){ //check that it is the button debouncing
         if ((pressed2 == 1) && !(P1IN & BIT5)){   //button was pressed properly
-             timerCount2 = 0;                     //Reset the timer count
+             timer_count2 = 0;                     //Reset the timer count
              pressed2 = 0;                        //reset pressed
              held2 = 1;                           //Button is being held
              //change the value held in the array
@@ -1863,7 +1935,7 @@ __interrupt void Timer1_A0 (void)
     }
 
     //fading in/out and breathing, part 1, can be 22 or 23
-    if(((led1_fade_in == 22) && (led1_fade_in == 23)) || ((led1_fade_out == 22) && (led1_fade_out == 23)) || ((led1_breath == 22) && (led1_breath == 23))){
+    if(((led1_fade_in == 22) || (led1_fade_in == 23)) || ((led1_fade_out == 22) || (led1_fade_out == 23)) || ((led1_breath == 22) || (led1_breath == 23))){
         if(counter_val_1 < brightness_1){
             P1OUT |= BIT0;                              //Turn on light
         } else {
@@ -1899,7 +1971,7 @@ __interrupt void Timer1_A0 (void)
 
          if (brightness_1 == 0) {       //reached lowest value
             P1OUT &= ~BIT0;                 //keep light off
-            led1_fade_out = -2;          //completed task, deactivate it
+            led1_fade_out = -1;          //completed task, deactivate it
         }
 
         TA1CCR0 += period_1;
@@ -1929,7 +2001,7 @@ __interrupt void Timer1_A0 (void)
     }
 
     //fading in/out and breathing, part 1, can be 22 or 23
-    if(((led2_fade_in == 22) && (led2_fade_in == 23)) || ((led2_fade_out == 22) && (led2_fade_out == 23)) || ((led2_breath == 22) && (led2_breath == 23))){
+    if(((led2_fade_in == 22) || (led2_fade_in == 23)) || ((led2_fade_out == 22) || (led2_fade_out == 23)) || ((led2_breath == 22) || (led2_breath == 23))){
         if(counter_val_2 < brightness_2){
             P1OUT |= BIT6;                              //Turn on light
         } else {
@@ -1965,7 +2037,7 @@ __interrupt void Timer1_A0 (void)
 
          if (brightness_2 == 0) {       //reached lowest value
             P1OUT &= ~BIT6;                 //keep light off
-            led2_fade_out = -2;          //completed task, deactivate it
+            led2_fade_out = -1;          //completed task, deactivate it
         }
 
         TA1CCR0 += period_2;
@@ -2024,7 +2096,7 @@ __interrupt void Timer1_A0 (void)
     }
 
     //fading in/out and breathing, part 1, can be 22 or 23
-    if(((led3_fade_in == 22) && (led3_fade_in == 23)) || ((led3_fade_out == 22) && (led3_fade_out == 23)) || ((led3_breath == 22) && (led3_breath == 23))){
+    if(((led3_fade_in == 22) || (led3_fade_in == 23)) || ((led3_fade_out == 22) || (led3_fade_out == 23)) || ((led3_breath == 22) || (led3_breath == 23))){
         if(counter_val_3 < brightness_3){
             P2OUT |= colours[colour];                              //Turn on light
         } else {
@@ -2060,7 +2132,7 @@ __interrupt void Timer1_A0 (void)
 
          if (brightness_3 == 0) {       //reached lowest value
             P2OUT &= ~(BIT1 + BIT3 + BIT5);                 //keep light off
-            led3_fade_out = -2;          //completed task, deactivate it
+            led3_fade_out = -1;          //completed task, deactivate it
         }
 
         TA1CCR0 += period_3;
@@ -2100,7 +2172,7 @@ __interrupt void Timer1_A0 (void)
 
         //check if less or greater than the wanted duration
         if(buzzer_count >= buzzer_duration){
-            buzzer_tone = -2; //turn it off
+            buzzer_tone = -1; //turn it off
         }
 
         TA1CCR0 += buzzer_period;
@@ -2149,20 +2221,25 @@ __interrupt void Timer1_A1(void){
         //check for how long button was pressed
         if ((button == 4) && (held == 1)) {
             if ((held == 1) && !(P1IN & BIT3)) { //check how long its being held for
-                timerCount += 1;
-
+                timer_count += 1;
+                //offset TA1CCR1 by the count number/period
+                TA1CCR1 += count_b;
             } else if ((held == 1) && (P1IN & BIT3)){   //if button was released
                 //send timer count signal here
+                send_message = 1;
+                send[0][1] = 1; //set flag
+                send[1][1] = timer_count; //the time held
+
                 led1_blink = 1;
                 //testing with light first
                // P1OUT ^= BIT0;
                 held = 0;                               //button has now been released
+                TA1CCR1 = 0;
             }
-            //offset TA1CCR1 by the count number/period
-            TA1CCR1 += count_b;
+
         } else if (button == 4){ //check that it is the button debouncing
             if ((pressed == 1) && !(P1IN & BIT3)){   //button was pressed properly
-                 timerCount = 0;                     //Reset the timer count
+                 timer_count = 0;                     //Reset the timer count
                  pressed = 0;                        //reset pressed
                  held = 1;                           //Button is being held
                  P1OUT ^= BIT6;
@@ -2180,17 +2257,22 @@ __interrupt void Timer1_A1(void){
         //button 2, copied code
         if ((button2 == 4) && (held2 == 1)) {
             if ((held2 == 1) && !(P1IN & BIT5)) { //check how long its being held for
-                timerCount2 += 1;
-
+                timer_count2 += 1;
+                //offset TA0CCR0 by the count number/period
+                TA1CCR1 += count_b2;
             } else if ((held2 == 1) && (P1IN & BIT5)){   //if button was released
                 //send timer count signal here
+                send_message = 1;
+                send[0][1] = 1; //set flag
+                send[1][1] = timer_count2; //the time held
+
                 held2 = 0;                               //button has now been released
+                TA1CCR1 = 0;
             }
-            //offset TA0CCR0 by the count number/period
-            TA1CCR1 += count_b2;
+
         } else if (button2 == 4){ //check that it is the button debouncing
             if ((pressed2 == 1) && !(P1IN & BIT5)){   //button was pressed properly
-                 timerCount2 = 0;                     //Reset the timer count
+                 timer_count2 = 0;                     //Reset the timer count
                  pressed2 = 0;                        //reset pressed
                  held2 = 1;                           //Button is being held
                  //change the value held in the array
@@ -2207,7 +2289,7 @@ __interrupt void Timer1_A1(void){
         //LED1 blinking
         if(led1_blink == 4){
             P1OUT ^= BIT0;
-            TACCR1 += blink_rate_1;
+            TA1CCR1 += blink_rate_1;
         }
 
         //fading in/out and breathing, part 1, can be 24
@@ -2247,7 +2329,7 @@ __interrupt void Timer1_A1(void){
 
              if (brightness_1 == 0) {       //reached lowest value
                 P1OUT &= ~BIT0;                 //keep light off
-                led1_fade_out = -2;          //completed task, deactivate it
+                led1_fade_out = -1;          //completed task, deactivate it
             }
 
             TA1CCR1 += period_1;
@@ -2313,7 +2395,7 @@ __interrupt void Timer1_A1(void){
 
              if (brightness_2 == 0) {       //reached lowest value
                 P1OUT &= ~BIT6;                 //keep light off
-                led2_fade_out = -2;          //completed task, deactivate it
+                led2_fade_out = -1;          //completed task, deactivate it
             }
 
             TA1CCR1 += period_2;
@@ -2408,7 +2490,7 @@ __interrupt void Timer1_A1(void){
 
              if (brightness_3 == 0) {       //reached lowest value
                 P2OUT &= ~(BIT1 + BIT3 + BIT5);   //keep light off
-                led3_fade_out = -2;          //completed task, deactivate it
+                led3_fade_out = -1;          //completed task, deactivate it
             }
 
             TA1CCR1 += period_3;
@@ -2449,7 +2531,7 @@ __interrupt void Timer1_A1(void){
 
             //check if less or greater than the wanted duration
             if(buzzer_count >= buzzer_duration){
-                buzzer_tone = -2; //turn it off
+                buzzer_tone = -1; //turn it off
             }
 
             TA1CCR1 += buzzer_period;
@@ -2493,20 +2575,24 @@ __interrupt void Timer1_A1(void){
         //check for how long button was pressed
         if ((button == 5) && (held == 1)) {
             if ((held == 1) && !(P1IN & BIT3)) { //check how long its being held for
-                timerCount += 1;
-
+                timer_count += 1;
+                //offset TA0CCR0 by the count number/period
+                TA1CCR2 += count_b;
             } else if ((held == 1) && (P1IN & BIT3)){   //if button was released
                 //send timer count signal here
+                send_message = 1;
+                send[0][1] = 1; //set flag
+                send[1][1] = timer_count; //the time held
+
                 led1_blink = 1;
-                //testing with light first
-               // P1OUT ^= BIT0;
                 held = 0;                               //button has now been released
+                TA1CCR2 = 0;
+
             }
-            //offset TA0CCR0 by the count number/period
-            TA1CCR2 += count_b;
+
         } else if (button == 5){ //check that it is the button debouncing
             if ((pressed == 1) && !(P1IN & BIT3)){   //button was pressed properly
-                 timerCount = 0;                     //Reset the timer count
+                 timer_count = 0;                     //Reset the timer count
                  pressed = 0;                        //reset pressed
                  held = 1;                           //Button is being held
                  P1OUT ^= BIT6;
@@ -2524,18 +2610,22 @@ __interrupt void Timer1_A1(void){
         //button 2, copied code
         if ((button2 == 5) && (held2 == 1)) {
             if ((held2 == 1) && !(P1IN & BIT5)) { //check how long its being held for
-                timerCount2 += 1;
-
+                timer_count2 += 1;
+                //offset TA0CCR0 by the count number/period
+                TA1CCR2 += count_b2;
             } else if ((held2 == 1) && (P1IN & BIT5)){   //if button was released
                 //send timer count signal here
+                send_message = 1;
+                send[0][1] = 1; //set flag
+                send[1][1] = timer_count2; //the time held
 
                 held2 = 0;                               //button has now been released
+                TA1CCR2 = 0;
             }
-            //offset TA0CCR0 by the count number/period
-            TA1CCR2 += count_b2;
+
         } else if (button2 == 5){ //check that it is the button debouncing
             if ((pressed2 == 1) && !(P1IN & BIT5)){   //button was pressed properly
-                 timerCount2 = 0;                     //Reset the timer count
+                 timer_count2 = 0;                     //Reset the timer count
                  pressed2 = 0;                        //reset pressed
                  held2 = 1;                           //Button is being held
 
@@ -2594,7 +2684,7 @@ __interrupt void Timer1_A1(void){
 
              if (brightness_1 == 0) {       //reached lowest value
                 P1OUT &= ~BIT0;                 //keep light off
-                led1_fade_out = -2;          //completed task, deactivate it
+                led1_fade_out = -1;          //completed task, deactivate it
             }
 
             TA1CCR2 += period_1;
@@ -2645,7 +2735,7 @@ __interrupt void Timer1_A1(void){
 
              if(brightness_2 == 0) {       //reached lowest value
                 P1OUT &= ~BIT6;                 //keep light off
-                led2_fade_out = -2;          //completed task, deactivate it
+                led2_fade_out = -1;          //completed task, deactivate it
             }
 
             TA1CCR2 += period_2;
@@ -2724,7 +2814,7 @@ __interrupt void Timer1_A1(void){
 
              if(brightness_3 == 0) {       //reached lowest value
                 P2OUT &= ~(BIT1 + BIT3 + BIT5); //keep light off
-                led3_fade_out = -2;          //completed task, deactivate it
+                led3_fade_out = -1;          //completed task, deactivate it
             }
 
             TA1CCR2 += period_3;
@@ -2765,7 +2855,7 @@ __interrupt void Timer1_A1(void){
 
             //check if less or greater than the wanted duration
             if(buzzer_count >= buzzer_duration){
-                buzzer_tone = -2; //turn it off
+                buzzer_tone = -1; //turn it off
             }
 
             TA1CCR2 += buzzer_period;
@@ -2921,7 +3011,7 @@ int activate_free_timer(int registers, int counts[]){
     unsigned int index = 0;
     unsigned int i;
     for(i=0; i < 6; i++){
-       if((timers_used[i] == 0)){
+       if((timers_used[i] == 0) ){ //could potentially add in || (timers_used[i] == counts[index]) but would cause deactivation issues
            free[index] = i;
            index++;
        }
