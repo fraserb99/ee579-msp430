@@ -156,7 +156,7 @@ int activated_buzzer[];                         //Array for activated timer for 
 
 //array for timer usage, 0 if not used, 1 if used 0, second row is to indicate how many functions are using the timers
 //buttons needs their own and are therefore -1 if they are using the timer ie second row value is -1
-//pos as timer codes, 0 is here to verify uart timing
+//pos as timer codes, 0 is here to verify UART timing
 signed int timers_used[2][6] = {{0, 0, 0, 0, 0, 0},
                                 {0, 0, 0, 0, 0, 0}};
 unsigned int timer0_activated = 0;              //Boolean used for checking if TA0 has been activated
@@ -183,7 +183,7 @@ int main(void)
 	//stuff for testing
 	//P1DIR |= BIT0 + BIT6;      // P1.0, P1.6 output
 	//P2DIR |= BIT1;             //utilise D3
-	button = 1;
+	//button = 1;
 	//button2 = 1;
 	//pot = 1;
 	//thermometer = 1;
@@ -195,7 +195,8 @@ int main(void)
 	//led3_dir = 1;
 	//led1_breath = 1;
 	//led2_breath = 1;
-    led3_breath = 1;
+    //led3_breath = 1;
+	led1_fade_in = 1;
 	//led3_fade_out = 1;
 	//buzzer_beep = 1;
 
@@ -2946,17 +2947,10 @@ void deactivate_timer(int activated[], int len){
 
         switch (deactivate){ //deactivate specific timer count register
         case 0:
-            if(timers_used[1][0] > 0){ //assuming at least 1 as it will be deactivated
-                //reduce by 1
-                timers_used[1][0] = timers_used[1][0] - 1;
-            } else {
-                TA0CCR0 = 0;
-                timers_used[0][0] = 0;
-                timers_used[1][0] = 0;
-            }
+            //should not be reached
             break;
         case 1:
-            if(timers_used[1][1] > 0){ //assuming at least 1 as it will be deactivated
+            if(timers_used[1][1] > 1){ //assuming at least 1 as it will be deactivated
                 //reduce by 1
                 timers_used[1][1] = timers_used[1][1] - 1;
             } else {
