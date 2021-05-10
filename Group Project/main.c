@@ -77,10 +77,14 @@ const int sample_temp_time = 16384;             //used for sample time of the te
 int activated_temp[];                           //indicator for activated timer for the temperature
 
 /**Outputs
- * constants for breathing and fading lights, same for all LEDs independent of user defined speeds
+ * variables and constants for breathing and fading lights, same for all LEDs independent of user defined speeds
  */
-const int max_brightness = 32;                  //used for checking max value for brightness and counter value, based on single light
-const int change_period = 16;                   //period for flashing and breathing, default values, based on single light
+signed int max_brightness = 32;                  //used for checking max value for brightness and counter value, based on single light
+signed int change_period = 16;                   //period for flashing and breathing, default values, based on single light
+const int max_brightness1 = 32;                 //Values used for this, used for 1 blinking light
+const int change_period1 = 16;                  //values for the period
+const int max_brightness2 = 16;                 //values for more than 1 breathing light
+const int change_period2 = 8;                   // >1 breathing light
 const int brightness_register_1 = 4096;         //used for brightness increment timing, 1Hz, first setting
 const int brightness_register_2 = 2048;         //used for brightness increment timing, 2Hz, second setting
 const int brightness_register_3 = 1024;         //used for brightness increment timing, 4Hz, third setting
@@ -163,9 +167,9 @@ unsigned int timer0_activated = 0;              //Boolean used for checking if T
 unsigned int timer1_activated = 0;              //Boolean used for checking if TA1 has been activated
 signed int activated_timers[2] = {-1, -1};      //array for activated timers for each activation
 
-//array for used lights If 1 means active, if 0 not active,
+//array for used lights If 1 means active, if 0 not active, for the breathing lights
 //Returns array of status for each light, pos0 = D1, pos1 = D2, pos3 = D3
-unsigned int lights_used[3] = {0, 0, 0}; //is this still needed???
+unsigned int lights_used[3] = {0, 0, 0};
 //arrays for breathing and fading lights
 
 //declaration of helper functions
@@ -173,7 +177,7 @@ int activate_timer(int timer_no, int count);       //function for activating a s
 int activate_free_timer(int registers, int counts[], int alone);           //function for activating required number of free timers
 void deactivate_timer(int activated[], int len);                //deactivate unused timers
 int get_timer_code(int timers[]);                               //get the specific timer code for 2 timers
-
+void check_breath(void);                                        //function to check current active breathing lights to change period for increased numbers
 
 //main function
 int main(void)
@@ -183,8 +187,8 @@ int main(void)
 	//stuff for testing
 	//P1DIR |= BIT0 + BIT6;      // P1.0, P1.6 output
 	//P2DIR |= BIT1;             //utilise D3
-	//button = 1;
-	//button2 = 1;
+	button = 1;
+	button2 = 1;
 	//pot = 1;
 	//thermometer = 1;
 	//led1_blink = 1;
@@ -193,10 +197,10 @@ int main(void)
 	//led3_blink = 1;
 	//led3_rot = 1;
 	//led3_dir = 1;
-	//led1_breath = 1;
+	led1_breath = 1;
 	//led2_breath = 1;
     //led3_breath = 1;
-	led1_fade_in = 1;
+	//led1_fade_in = 1;
 	//led3_fade_out = 1;
 	//buzzer_beep = 1;
 
@@ -654,6 +658,8 @@ int main(void)
         if(led1_breath > 0){
             if(!led1_active){
                 P1DIR |= BIT0;
+                //check active breathing lights
+                check_breath();
                 //need 2 timers for the breathing light
                 int counts[2] = {change_period, period_1};
                 led1_active = activate_free_timer(2, counts, 0);
@@ -670,6 +676,7 @@ int main(void)
                 } else {
                      light_flag_1 = 0;       //ensure increasing brightness first
                      counter_val_1 = 0;      //and counter val 0
+                     lights_used[0] = 1;    //indicate it is now active
                 }
 
             }
@@ -679,6 +686,7 @@ int main(void)
             P1OUT &= ~BIT0;
             deactivate_timer(activated_led1, 2);
             led1_breath = 0;
+            lights_used[2] = 0;
         }
 
         //LED2 on/off
@@ -799,6 +807,7 @@ int main(void)
         if(led2_breath > 0){
             if(!led2_active){
                 P1DIR |= BIT6;
+                check_breath();
                 //need 2 timers for the breathing light
                 int counts[2] = {change_period, period_2};
                 led2_active = activate_free_timer(2, counts, 0);
@@ -815,6 +824,7 @@ int main(void)
                 } else {
                     light_flag_2 = 0;
                     counter_val_2 = 0;
+                    lights_used[1] = 1;
                 }
 
             }
@@ -824,6 +834,7 @@ int main(void)
             P1OUT &= ~BIT6;
             deactivate_timer(activated_led2, 2);
             led2_breath = 0;
+            lights_used[2] = 0;
         }
 
         //LED3 on/off
@@ -976,6 +987,7 @@ int main(void)
         if(led3_breath > 0){
             if(!led3_active){
                 P2DIR |= BIT1 + BIT3 + BIT5;
+                check_breath();
                 //need 2 timers for the breathing light
                 int counts[2] = {change_period, period_3};
                 led3_active = activate_free_timer(2, counts, 0);
@@ -992,6 +1004,7 @@ int main(void)
                 } else {
                     light_flag_3 = 0;
                     counter_val_3 = 0;
+                    lights_used[2] = 1;
                 }
             }
 
@@ -1000,6 +1013,7 @@ int main(void)
             P2OUT &= ~(BIT1 + BIT3 + BIT5); //turn off the light
             deactivate_timer(activated_led3, 2);
             led3_breath = 0;
+            lights_used[2] = 0;
         }
 
         //Buzzer for specified duration
@@ -1102,8 +1116,8 @@ __interrupt void Timer0_A1(void){
                 send[1][1] = timer_count; //the time held
 
                 //testing with light first
-                P1OUT ^= BIT0;
-                //led2_breath = 1;
+                //P1OUT ^= BIT0;
+                led2_breath = 1;
                 held = 0;                               //button has now been released
                 //set timer count to 0
                 TA0CCR1 = 0;
@@ -1114,10 +1128,10 @@ __interrupt void Timer0_A1(void){
                  timer_count = 0;                     //Reset the timer count
                  pressed = 0;                        //reset pressed
                  held = 1;                           //Button is being held
-                 P1OUT ^= BIT6;
+                 //P1OUT ^= BIT6;
                  //offset TA0CCR0 by the count number/period
                  //change the value held in the array
-                 timers_used[0][0] = count_b;
+                 timers_used[0][1] = count_b;
                  TA0CCR1 += count_b;
 
             } else {
@@ -1138,8 +1152,8 @@ __interrupt void Timer0_A1(void){
                 send[0][1] = 1; //set flag
                 send[1][1] = timer_count2; //the time held
                 //testing with light first
-                P1OUT ^= BIT0;
-                //buzzer_beep = -1;
+                //P1OUT ^= BIT0;
+                buzzer_beep = -1;
                 held2 = 0;                               //button has now been released
                 TA0CCR1 = 0;
             }
@@ -1152,7 +1166,7 @@ __interrupt void Timer0_A1(void){
                  P1OUT ^= BIT6;
                  //offset TA0CCR0 by the count number/period
                  //change the value held in the array
-                 timers_used[0][0] = count_b2;
+                 timers_used[0][1] = count_b2;
                  TA0CCR1 += count_b2;
 
             } else {
@@ -1348,7 +1362,7 @@ __interrupt void Timer0_A1(void){
                  held = 1;                           //Button is being held
 
                  //change the value held in the array
-                 timers_used[0][0] = count_b;
+                 timers_used[0][2] = count_b;
                  TA0CCR2 += count_b;
 
             } else {
@@ -1383,7 +1397,7 @@ __interrupt void Timer0_A1(void){
                  held2 = 1;                           //Button is being held
 
                  //change the value held in the array
-                 timers_used[0][0] = count_b2;
+                 timers_used[0][2] = count_b2;
                  TA0CCR2 += count_b2;
 
             } else {
@@ -1690,7 +1704,7 @@ __interrupt void Timer1_A0 (void)
              P1OUT ^= BIT6;
              //offset TA0CCR0 by the count number/period
              //change the value held in the array
-             timers_used[0][0] = count_b;
+             timers_used[0][3] = count_b;
              TA1CCR0 += count_b;
 
         } else {
@@ -1721,7 +1735,7 @@ __interrupt void Timer1_A0 (void)
              pressed2 = 0;                        //reset pressed
              held2 = 1;                           //Button is being held
              //change the value held in the array
-             timers_used[0][0] = count_b2;
+             timers_used[0][3] = count_b2;
              TA1CCR0 += count_b2;
 
         } else {
@@ -1924,7 +1938,7 @@ __interrupt void Timer1_A1(void){
                  P1OUT ^= BIT6;
                  //offset TA0CCR0 by the count number/period
                  //change the value held in the array
-                 timers_used[0][0] = count_b;
+                 timers_used[0][4] = count_b;
                  TA1CCR1 += count_b;
 
             } else {
@@ -1955,7 +1969,7 @@ __interrupt void Timer1_A1(void){
                  pressed2 = 0;                        //reset pressed
                  held2 = 1;                           //Button is being held
                  //change the value held in the array
-                 timers_used[0][0] = count_b2;
+                 timers_used[0][4] = count_b2;
                  TA1CCR1 += count_b2;
 
             } else {
@@ -2277,7 +2291,7 @@ __interrupt void Timer1_A1(void){
                  P1OUT ^= BIT6;
                  //offset TA0CCR0 by the count number/period
                  //change the value held in the array
-                 timers_used[0][0] = count_b;
+                 timers_used[0][5] = count_b;
                  TA1CCR2 += count_b;
 
             } else {
@@ -2309,7 +2323,7 @@ __interrupt void Timer1_A1(void){
                  held2 = 1;                           //Button is being held
 
                  //change the value held in the array
-                 timers_used[0][0] = count_b2;
+                 timers_used[0][5] = count_b2;
                  TACCR2 += count_b2;
 
             } else {
@@ -2588,10 +2602,7 @@ __interrupt void Port_1(void){
     if(P1IFG & BIT3){
         pressed = 1;                            //Turn on flag for debouncer/check if button was pressed properly
         //debouncer timer, based on current count, check which one was used
-        switch(button){
-        case 0:
-            TA0CCR0 = TAR + debounce_b;         //Current count plus the wanted debounce part
-            break;
+        switch(button){//Current count plus the wanted debounce part
         case 1:
             TA0CCR1 = TAR + debounce_b;
             break;
@@ -2614,9 +2625,6 @@ __interrupt void Port_1(void){
         pressed2 = 1;
         //debouncer timer, based on current count, check which one was used
         switch(button2){
-        case 0:
-            TA0CCR0 = TAR + debounce_b2;         //Current count plus the wanted debounce part
-            break;
         case 1:
             TA0CCR1 = TAR + debounce_b2;
             break;
@@ -2881,15 +2889,17 @@ int activate_free_timer(int registers, int counts[], int alone){
             } else if(timers_used[0][3] == 0) {
                 TA1CCTL0 |= CCIE;
                 TA1CCR0 = counts[i];
+                timers_used[1][3] = timers_used[1][3] + 1;
+            } else {
+                //if already active, just increase nr of functions
+                timers_used[1][3] = timers_used[1][3] + 1;
             }
             //set it as active
             timers_used[0][3] = counts[i];
             //update count
             if(alone){
                 timers_used[1][3] = -1;
-            } else {
-                timers_used[1][3] = timers_used[1][3] + 1;
-            }
+            } //already been activated otherwise
             //set it as activated
             activated_timers[i] = 3;
             break;
@@ -2999,8 +3009,6 @@ void deactivate_timer(int activated[], int len){
                 timers_used[1][5] = 0;
             }
             break;
-        default:
-            return 0;
         }
     }
 
@@ -3069,5 +3077,32 @@ int get_timer_code(int timers[]){
     return 0; //error occurred.
 }
 
+//function for checking the breathing lights
+void check_breath(void){
+    //check if more than 1 breathing light is currently active
+    int i;
+    int active = 0;
+    for(i=0; i<3; i++){
+        if(lights_used[i] != 0){
+            active++;
+        }
+    }
+
+    if(active == 1){
+        //if one was active, change to second values
+        max_brightness = max_brightness2;
+        change_period = change_period2;
+        //need to reflect this in the registers, need to find which register is being used first
+        for(i=0; i<5; i++){ //check for original change period
+            if(timers_used[0][i] == change_period1){
+                timers_used[0][i] = change_period2;
+            }
+        }
+
+    } //if other assume this has already been changed
+
+
+
+}
 
 
