@@ -24,12 +24,10 @@ unsigned int send_message = 0;                  //flag used to indicate that at 
  * A0_1 = 1, A0_2 = 2, A1_0 = 3, A1_1 = 4, A1_2 = 5
  *
  * For 2 timers
- * A0_0 +           A0_1 +          A0_2 +          A1_0 +          A1_1 +
- *      A0_1 = 10,      A0_2 = 15,      A1_0 = 19,      A1_1 = 22,      A1_2 = 24,
- *      A0_2 = 11,      A1_0 = 16,      A1_1 = 20,      A1_2 = 23,
- *      A1_0 = 12,      A1_1 = 17,      A1_2 = 21,
- *      A1_1 = 13,      A1_2 = 18,
- *      A1_2 = 14,
+ * A0_1 +          A1_0 +          A1_1 +
+ *    A0_2 = 10,      A1_1 = 11,      A1_2 = 13,
+ *                    A1_2 = 12,
+ *
  *
  *
  */
@@ -81,8 +79,8 @@ int activated_temp[];                           //indicator for activated timer 
 /**Outputs
  * constants for breathing and fading lights, same for all LEDs independent of user defined speeds
  */
-const int max_brightness = 32;                  //used for checking max value for brightness and counter value
-const int change_period = 16;                   //period for flashing and breathing, default values
+const int max_brightness = 32;                  //used for checking max value for brightness and counter value, based on single light
+const int change_period = 16;                   //period for flashing and breathing, default values, based on single light
 const int brightness_register_1 = 4096;         //used for brightness increment timing, 1Hz, first setting
 const int brightness_register_2 = 2048;         //used for brightness increment timing, 2Hz, second setting
 const int brightness_register_3 = 1024;         //used for brightness increment timing, 4Hz, third setting
@@ -133,7 +131,7 @@ signed int led3_breath = 0;                    //LED3 blinking light
 #define BLUE (BIT5)
 #define YELLOW (BIT1 + BIT3)
 #define PURPLE (BIT1 + BIT5)
-#define CYAN (BIT3 + BIT5)
+#define CYAN (BIT3 + BIT5) //remove this
 #define WHITE (BIT1 + BIT3 + BIT5)
 const int colours[] = {RED, GREEN, BLUE, YELLOW, PURPLE, CYAN, WHITE};    //Array for the colours
 unsigned int colour = 0;                        //The colour selected
@@ -156,9 +154,11 @@ unsigned int buzzer_count = 0;                  //counter variable for the on pe
 const int buzzer_period = 82;                 //timer for counting the required on period, 50ms = 20Hz
 int activated_buzzer[];                         //Array for activated timer for the buzzer
 
-//array for timer usage, 0 if not used, 1 if used 0,
+//array for timer usage, 0 if not used, 1 if used 0, second row is to indicate how many functions are using the timers
+//buttons needs their own and are therefore -1 if they are using the timer ie second row value is -1
 //pos as timer codes, 0 is here to verify uart timing
-unsigned int timers_used[6] = {0, 0, 0, 0, 0, 0};
+signed int timers_used[2][6] = {{0, 0, 0, 0, 0, 0},
+                                {0, 0, 0, 0, 0, 0}};
 unsigned int timer0_activated = 0;              //Boolean used for checking if TA0 has been activated
 unsigned int timer1_activated = 0;              //Boolean used for checking if TA1 has been activated
 signed int activated_timers[2] = {-1, -1};      //array for activated timers for each activation
@@ -169,8 +169,8 @@ unsigned int lights_used[3] = {0, 0, 0}; //is this still needed???
 //arrays for breathing and fading lights
 
 //declaration of helper functions
-int activate_timer(int timer_no, int count1, int count2);       //function for activating a specific timer
-int activate_free_timer(int registers, int counts[]);           //function for activating required number of free timers
+int activate_timer(int timer_no, int count);       //function for activating a specific timer
+int activate_free_timer(int registers, int counts[], int alone);           //function for activating required number of free timers
 void deactivate_timer(int activated[], int len);                //deactivate unused timers
 int get_timer_code(int timers[]);                               //get the specific timer code for 2 timers
 
@@ -183,7 +183,7 @@ int main(void)
 	//stuff for testing
 	//P1DIR |= BIT0 + BIT6;      // P1.0, P1.6 output
 	//P2DIR |= BIT1;             //utilise D3
-	//button = 1;
+	button = 1;
 	//button2 = 1;
 	//pot = 1;
 	//thermometer = 1;
@@ -194,20 +194,24 @@ int main(void)
 	//led3_rot = 1;
 	//led3_dir = 1;
 	//led1_breath = 1;
-	//led3_breath = 1;
-    //led3_fade_in = 1;
+	//led2_breath = 1;
+    led3_breath = 1;
 	//led3_fade_out = 1;
 	//buzzer_beep = 1;
 
 	//UART stuff
     //reserve timer A0_0 for UART, arbitrary nr for now:
     //returns 1 on success
-    int uart_timer = activate_timer(0, 16384, 0);
+    int uart_timer = activate_timer(0, 16384);
+    //want it to be reserved
+    timers_used[1][0] = -1;
+
     if(uart_timer != 1){
         //error occurred
         send_message = 1;
         send[0][0] = 1; //set flag
         send[1][0] = 1; //generic error
+
     }
 
 
@@ -279,7 +283,7 @@ int main(void)
                 P1IE |= BIT3;                             //Interrupt enable
 
                 int counts[1] = {debounce_b};
-                b_activated = activate_free_timer(1, counts);
+                b_activated = activate_free_timer(1, counts, -1); //activate free timer, needs to be alone
                 //record which ones were activated
                 activated_button[0] = activated_timers[0];
                 button = activated_button[0];                //assign to check properly for timer interrupts
@@ -340,7 +344,7 @@ int main(void)
                 P1IE |= BIT5;                             //Interrupt enable
 
                 int counts[1] = {debounce_b2};
-                b2_activated = activate_free_timer(1, counts);
+                b2_activated = activate_free_timer(1, counts, -1); //single timer, alone
                 //record which ones were activated
                 activated_button2[0] = activated_timers[0];
                 button2 = activated_button2[0];                //assign to check properly for timer interrupts
@@ -469,7 +473,7 @@ int main(void)
                     //set up a timer for stabilisation, use A1
                     //need a 30microsecond delay calculation time was 0.49, putting 10 to test, need only 1 timer
                     int counts[1] = {10};
-                    t_activated = activate_free_timer(1, counts);
+                    t_activated = activate_free_timer(1, counts, 0); //single timer, doesn't need to be alone
                     activated_temp[0] = activated_timers[0];      //record which ones were activated
                     thermometer = activated_temp[0];              //Set for proper check in interrupts
                     if (t_activated != 1) { //if return is 1, has now been activated
@@ -552,7 +556,7 @@ int main(void)
                 P1DIR |= BIT0;
                 //need a timer for the blinking, only 1
                 int counts[1] = {blink_rate_1};
-                led1_active = activate_free_timer(1, counts);
+                led1_active = activate_free_timer(1, counts, 0); //1 timer, doesn't need to be alone
                 activated_led1[0] = activated_timers[0]; //record which ones were activated
                 led1_blink = activated_led1[0];
                 if (led1_active != 1) { //if return is 1, has now been activated
@@ -580,9 +584,9 @@ int main(void)
             if(!led1_active){
                 P1DIR |= BIT0;
                 P1OUT &= ~BIT0; //don't want it on
-                //need 2 timers for the fading in
+                //need 2 timers for the fading in, doesn't need to be alone
                 int counts[2] = {change_period, period_1};
-                led1_active = activate_free_timer(2, counts);
+                led1_active = activate_free_timer(2, counts, 0);
                 activated_led1[0] = activated_timers[0]; //record which ones were activated, first
                 activated_led1[1] = activated_timers[1]; //record second one
                 led1_fade_in = get_timer_code(activated_led1);
@@ -611,9 +615,9 @@ int main(void)
         if(led1_fade_out > 0){
             if(!led1_fo_active){ //if light hasn't been activated, or if on
                 P1DIR |= BIT0;
-                //need 2 timers for the fading in
+                //need 2 timers for the fading in, doesn't need to be alone
                 int counts[2] = {change_period, period_1};
-                led1_fo_active = activate_free_timer(2, counts);
+                led1_fo_active = activate_free_timer(2, counts, 0);
                 activated_led1[0] = activated_timers[0]; //record which ones were activated, first
                 activated_led1[1] = activated_timers[1]; //record second one
                 led1_fade_out = get_timer_code(activated_led1);
@@ -651,7 +655,7 @@ int main(void)
                 P1DIR |= BIT0;
                 //need 2 timers for the breathing light
                 int counts[2] = {change_period, period_1};
-                led1_active = activate_free_timer(2, counts);
+                led1_active = activate_free_timer(2, counts, 0);
                 activated_led1[0] = activated_timers[0]; //record which ones were activated, first
                 activated_led1[1] = activated_timers[1]; //record second one
                 led1_breath = get_timer_code(activated_led1);
@@ -697,7 +701,7 @@ int main(void)
                 P1DIR |= BIT6;
                 //need a timer for the blinking, only 1
                 int counts[1] = {blink_rate_1};
-                led2_active = activate_free_timer(1, counts);
+                led2_active = activate_free_timer(1, counts, 0);
                 activated_led2[0] = activated_timers[0]; //record which ones were activated
                 led2_blink = activated_led2[0];
                 if (led2_active != 1) { //if return is 1, has now been activated
@@ -726,7 +730,7 @@ int main(void)
                 P1OUT &= ~BIT6; //don't want it on
                 //need 2 timers for the fading in
                 int counts[2] = {change_period, period_2};
-                led2_active = activate_free_timer(2, counts);
+                led2_active = activate_free_timer(2, counts, 0);
                 activated_led2[0] = activated_timers[0]; //record which ones were activated, first
                 activated_led2[1] = activated_timers[1]; //record second one
                 led2_fade_in = get_timer_code(activated_led2);
@@ -757,7 +761,7 @@ int main(void)
                 P1DIR |= BIT6;
                 //need 2 timers for the fading in
                 int counts[2] = {change_period, period_2};
-                led2_fo_active = activate_free_timer(2, counts);
+                led2_fo_active = activate_free_timer(2, counts, 0);
                 activated_led2[0] = activated_timers[0]; //record which ones were activated, first
                 activated_led2[1] = activated_timers[1]; //record second one
                 led2_fade_out = get_timer_code(activated_led2);
@@ -796,7 +800,7 @@ int main(void)
                 P1DIR |= BIT6;
                 //need 2 timers for the breathing light
                 int counts[2] = {change_period, period_2};
-                led2_active = activate_free_timer(2, counts);
+                led2_active = activate_free_timer(2, counts, 0);
                 activated_led2[0] = activated_timers[0]; //record which ones were activated, first
                 activated_led2[1] = activated_timers[1]; //record second one
                 led2_breath = get_timer_code(activated_led2);
@@ -843,7 +847,7 @@ int main(void)
                 P2DIR |= BIT1 + BIT3 + BIT5;
                 //need a timer for the rotation speed, only 1
                 int counts[1] = {blink_rate_3};
-                led3_active = activate_free_timer(1, counts);
+                led3_active = activate_free_timer(1, counts, 0);
                 activated_led3[0] = activated_timers[0]; //record which ones were activated
                 led3_rot = activated_led3[0];
                 if (led3_active != 1) { //if return is 1, has now been activated
@@ -873,7 +877,7 @@ int main(void)
                 P2DIR |= BIT1 + BIT3 + BIT5;
                 //need a timer for the rotation speed, only 1
                 int counts[1] = {blink_rate_3};
-                led3_active = activate_free_timer(1, counts);
+                led3_active = activate_free_timer(1, counts, 0);
                 activated_led3[0] = activated_timers[0]; //record which ones were activated
                 led3_blink = activated_led3[0];
                 if (led3_active != 1) { //if return is 1, has now been activated
@@ -906,7 +910,7 @@ int main(void)
                 P2OUT &= ~(BIT1 + BIT3 + BIT5); //don't want it on
                 //need 2 timers for the fading in
                 int counts[2] = {change_period, period_3};
-                led3_active = activate_free_timer(2, counts);
+                led3_active = activate_free_timer(2, counts, 0);
                 activated_led3[0] = activated_timers[0]; //record which ones were activated, first
                 activated_led3[1] = activated_timers[1]; //record second one
                 led3_fade_in = get_timer_code(activated_led3);
@@ -934,7 +938,7 @@ int main(void)
                 P2DIR |= BIT1 + BIT3 + BIT5;
                 //need 2 timers for the fading in
                 int counts[2] = {change_period, period_3};
-                led3_fo_active = activate_free_timer(2, counts);
+                led3_fo_active = activate_free_timer(2, counts, 0);
                 activated_led3[0] = activated_timers[0]; //record which ones were activated, first
                 activated_led3[1] = activated_timers[1]; //record second one
                 led3_fade_out = get_timer_code(activated_led3);
@@ -973,7 +977,7 @@ int main(void)
                 P2DIR |= BIT1 + BIT3 + BIT5;
                 //need 2 timers for the breathing light
                 int counts[2] = {change_period, period_3};
-                led3_active = activate_free_timer(2, counts);
+                led3_active = activate_free_timer(2, counts, 0);
                 activated_led3[0] = activated_timers[0]; //record which ones were activated, first
                 activated_led3[1] = activated_timers[1]; //record second one
                 led3_breath = get_timer_code(activated_led3);
@@ -1008,7 +1012,7 @@ int main(void)
                 buzzer_duration = buzzer_duration/5; //ensure duration is proper
                 //need to have 1 timer
                 int counts[1] = {buzzer_period};
-                buzzer_active = activate_free_timer(1, counts);
+                buzzer_active = activate_free_timer(1, counts, 0);
                 activated_buzzer[0] = activated_timers[0]; //record which one were activated
                 buzzer_tone = activated_buzzer[0]; //get the timer
                 if (buzzer_active == 0) { //if return is anything but 0, has now been activated
@@ -1040,7 +1044,7 @@ int main(void)
                 buzzer_duration_off = buzzer_duration_off/5; //ensure duration is proper
                 //need to have 1 timer
                 int counts[1] = {buzzer_period};
-                buzzer_active = activate_free_timer(1, counts);
+                buzzer_active = activate_free_timer(1, counts, 0);
                 activated_buzzer[0] = activated_timers[0]; //record which one were activated
                 buzzer_beep = activated_buzzer[0];
                 if (buzzer_active == 0) { //if return is anything but 0, has now been activated
@@ -1097,8 +1101,8 @@ __interrupt void Timer0_A1(void){
                 send[1][1] = timer_count; //the time held
 
                 //testing with light first
-                //P1OUT ^= BIT0;
-                led1_blink = 1;
+                P1OUT ^= BIT0;
+                //led2_breath = 1;
                 held = 0;                               //button has now been released
                 //set timer count to 0
                 TA0CCR1 = 0;
@@ -1109,10 +1113,10 @@ __interrupt void Timer0_A1(void){
                  timer_count = 0;                     //Reset the timer count
                  pressed = 0;                        //reset pressed
                  held = 1;                           //Button is being held
-                 //P1OUT ^= BIT6;
+                 P1OUT ^= BIT6;
                  //offset TA0CCR0 by the count number/period
                  //change the value held in the array
-                 timers_used[0] = count_b;
+                 timers_used[0][0] = count_b;
                  TA0CCR1 += count_b;
 
             } else {
@@ -1133,8 +1137,8 @@ __interrupt void Timer0_A1(void){
                 send[0][1] = 1; //set flag
                 send[1][1] = timer_count2; //the time held
                 //testing with light first
-                //P1OUT ^= BIT0;
-                buzzer_beep = -1;
+                P1OUT ^= BIT0;
+                //buzzer_beep = -1;
                 held2 = 0;                               //button has now been released
                 TA0CCR1 = 0;
             }
@@ -1144,10 +1148,10 @@ __interrupt void Timer0_A1(void){
                  timer_count2 = 0;                     //Reset the timer count
                  pressed2 = 0;                        //reset pressed
                  held2 = 1;                           //Button is being held
-                 //P1OUT ^= BIT6;
+                 P1OUT ^= BIT6;
                  //offset TA0CCR0 by the count number/period
                  //change the value held in the array
-                 timers_used[0] = count_b2;
+                 timers_used[0][0] = count_b2;
                  TA0CCR1 += count_b2;
 
             } else {
@@ -1181,8 +1185,8 @@ __interrupt void Timer0_A1(void){
             TA0CCR1 += blink_rate_1;
         }
 
-        //fading in/out and breathing, part 1, can be 15, 16, 17, or 18
-        if(((led1_fade_in >= 15) && (led1_fade_in <= 18)) || ((led1_fade_out >= 15) && (led1_fade_out <= 18)) || ((led1_breath >= 15) && (led1_breath <= 18))){
+        //fading in/out and breathing, part 1, can only be 10
+        if((led1_fade_in == 10) || (led1_fade_out == 10) || (led1_breath == 10)){
             if(counter_val_1 < brightness_1){
                 P1OUT |= BIT0;                              //Turn on light
             } else {
@@ -1196,59 +1200,14 @@ __interrupt void Timer0_A1(void){
             TA0CCR1 += change_period;
         }
 
-        //fade in part 2
-        if(led1_fade_in == 10) {
-            if(light_flag_1 == 0){
-                brightness_1 += 1;                //increase brightness
-            }
-
-            if(brightness_1 == max_brightness){               //if max brightness
-                P1OUT |= BIT0;             //leave it on
-                led1_fade_in = -1;          //completed task
-            }
-
-            TA0CCR1 += period_1;
-        }
-
-        //fade out part 2
-        if(led1_fade_out == 10) {
-            if(light_flag_1 == 1) {
-                brightness_1 -= 1;                //decrease brightness
-            }
-
-             if (brightness_1 == 0) {       //reached lowest value
-                P1OUT &= ~BIT0;                 //keep light off
-                led1_fade_out = -1;          //completed task, deactivate it
-            }
-
-            TA0CCR1 += period_1;
-        }
-
-        //breathing part 2
-        if(led1_breath == 10){
-            if(light_flag_1 == 0){
-                brightness_1 += 1;                //increase brightness
-            } else {
-                brightness_1 -= 1;                //decrease brightness
-            }
-
-            if(brightness_1 == max_brightness){               //if max brightness
-                light_flag_1 = 1;                //set to decrease
-            } else if (brightness_1 == 0) {       //reached lowest value
-                light_flag_1 = 0;                //increase light
-            }
-
-            TA0CCR1 += period_1;
-        }
-
         //LED2 blinking
         if(led2_blink == 1){
             P1OUT ^= BIT6;
             TA0CCR1 += blink_rate_2;
         }
 
-        //fading in/out and breathing, part 1, can be 15, 16, 17, or 18
-        if(((led2_fade_in >= 15) && (led2_fade_in <= 18)) || ((led2_fade_out >= 15) && (led2_fade_out <= 18)) || ((led2_breath >= 15) && (led2_breath <= 18))){
+        //fading in/out and breathing, part 1, can only be 10
+        if((led2_fade_in == 10) || (led2_fade_out == 10) || (led2_breath == 10)){
             if(counter_val_2 < brightness_2){
                 P1OUT |= BIT6;                              //Turn on light
             } else {
@@ -1260,51 +1219,6 @@ __interrupt void Timer0_A1(void){
                 counter_val_2 = 0;
             }
             TA0CCR1 += change_period;
-        }
-
-        //fade in part 2
-        if(led2_fade_in == 10) {
-            if(light_flag_2 == 0){
-                brightness_2 += 1;                //increase brightness
-            }
-
-            if(brightness_2 == max_brightness){               //if max brightness
-                P1OUT |= BIT6;             //leave it on
-                led2_fade_in = -1;          //completed task
-            }
-
-            TA0CCR1 += period_2;
-        }
-
-        //fade out part 2
-        if(led2_fade_out == 10) {
-            if(light_flag_2 == 1) {
-                brightness_2 -= 1;                //decrease brightness
-            }
-
-             if (brightness_2 == 0) {       //reached lowest value
-                P1OUT &= ~BIT6;                 //keep light off
-                led2_fade_out = -1;          //completed task, deactivate it
-            }
-
-            TA0CCR1 += period_2;
-        }
-
-        //breathing part 2
-        if(led2_breath == 10){
-            if(light_flag_2 == 0){
-                brightness_2 += 1;                //increase brightness
-            } else {
-                brightness_2 -= 1;                //decrease brightness
-            }
-
-            if(brightness_2 == max_brightness){               //if max brightness
-                light_flag_2 = 1;                //set to decrease
-            } else if (brightness_2 == 0) {       //reached lowest value
-                light_flag_2 = 0;                //increase light
-            }
-
-            TA0CCR1 += period_2;
         }
 
         //LED3 rotating
@@ -1342,8 +1256,8 @@ __interrupt void Timer0_A1(void){
             }
         }
 
-        //fading in/out and breathing, part 1, can be 15, 16, 17, or 18
-        if(((led3_fade_in >= 15) && (led3_fade_in <= 18)) || ((led3_fade_out >= 15) && (led3_fade_out <= 18)) || ((led3_breath >= 15) && (led3_breath <= 18))){
+        //fading in/out and breathing, part 1, 10
+        if((led3_fade_in == 10) || (led3_fade_out == 10) || (led3_breath == 10)){
             if(counter_val_3 < brightness_3){
                 P2OUT |= colours[colour];                              //Turn on light
             } else {
@@ -1355,60 +1269,6 @@ __interrupt void Timer0_A1(void){
                 counter_val_3 = 0;
             }
             TA0CCR1 += change_period;
-        }
-
-        //fade in part 2
-        if(led3_fade_in == 10) {
-            if(light_flag_3 == 0){
-                brightness_3 += 1;                //increase brightness
-            }
-
-            if(brightness_3 == max_brightness){               //if max brightness
-                P2OUT |= colours[colour];             //leave it on
-                led3_fade_in = -1;          //completed task
-            }
-
-            TA0CCR1 += period_3;
-        }
-
-        //fade out part 2
-        if(led3_fade_out == 10) {
-            if(light_flag_3 == 1) {
-                brightness_3 -= 1;                //decrease brightness
-            }
-
-             if (brightness_3 == 0) {       //reached lowest value
-                P2OUT &= ~(BIT1 + BIT3 + BIT5);                 //keep light off
-                led3_fade_out = -1;          //completed task, deactivate it
-            }
-
-            TA0CCR1 += period_3;
-        }
-
-        //breathing part 2
-        if(led3_breath == 10){
-            if(light_flag_3 == 0){
-                brightness_3 += 1;                //increase brightness
-            } else {
-                brightness_3 -= 1;                //decrease brightness
-            }
-
-            if(brightness_3 == max_brightness){               //if max brightness
-                light_flag_3 = 1;                //set to decrease
-            } else if (brightness_3 == 0) {       //reached lowest value
-                light_flag_3 = 0;                //increase light
-                //change colour
-                //verify boundaries
-                if ((colour == 0) && (led3_dir == -1)){
-                    colour = 6;
-                } else if ((colour == 6) && (led3_dir == 1)){
-                    colour = 0;
-                } else {
-                    colour = colour + led3_dir; //change colour based on direction
-                }
-            }
-
-            TA0CCR1 += period_3;
         }
 
         //Buzzer tone
@@ -1487,7 +1347,7 @@ __interrupt void Timer0_A1(void){
                  held = 1;                           //Button is being held
 
                  //change the value held in the array
-                 timers_used[0] = count_b;
+                 timers_used[0][0] = count_b;
                  TA0CCR2 += count_b;
 
             } else {
@@ -1509,7 +1369,8 @@ __interrupt void Timer0_A1(void){
                 send[1][1] = timer_count2; //the time held
 
                 //testing
-                buzzer_beep = -1;
+                led3_breath = 1;
+                //buzzer_beep = -1;
                 held2 = 0;                               //button has now been released
                 TA0CCR2 = 0;
             }
@@ -1521,7 +1382,7 @@ __interrupt void Timer0_A1(void){
                  held2 = 1;                           //Button is being held
 
                  //change the value held in the array
-                 timers_used[0] = count_b2;
+                 timers_used[0][0] = count_b2;
                  TA0CCR2 += count_b2;
 
             } else {
@@ -1555,23 +1416,8 @@ __interrupt void Timer0_A1(void){
             TA0CCR2 += blink_rate_1;
         }
 
-        //fading in/out and breathing, part 1, can be 19, 20, or 21
-        if(((led1_fade_in >= 19) && (led1_fade_in <= 21)) || ((led1_fade_out >= 19) && (led1_fade_out <= 21)) || ((led1_breath >= 19) && (led1_breath <= 21))){
-            if(counter_val_1 < brightness_1){
-                P1OUT |= BIT0;                              //Turn on light
-            } else {
-                P1OUT &= ~BIT0;
-            }
-            counter_val_1 += 1;                             //Increment the value to read from the array
-
-            if(counter_val_1 >= max_brightness){                       //reached max value, reset
-                counter_val_1 = 0;
-            }
-            TA0CCR2 += change_period;
-        }
-
         //fade in part 2
-        if((led1_fade_in == 11) || (led1_fade_in == 15)) {
+        if(led1_fade_in == 10) {
             if(light_flag_1 == 0){
                 brightness_1 += 1;                //increase brightness
             }
@@ -1585,7 +1431,7 @@ __interrupt void Timer0_A1(void){
         }
 
         //fade out part 2
-        if((led1_fade_out == 11) || (led1_fade_out == 15)) {
+        if(led1_fade_out == 10) {
             if(light_flag_1 == 1) {
                 brightness_1 -= 1;                //decrease brightness
             }
@@ -1599,7 +1445,7 @@ __interrupt void Timer0_A1(void){
         }
 
         //breathing part 2
-        if((led1_breath == 11) || (led1_breath == 15)){
+        if(led1_breath == 10){
             if(light_flag_1 == 0){
                 brightness_1 += 1;                //increase brightness
             } else {
@@ -1621,23 +1467,8 @@ __interrupt void Timer0_A1(void){
             TA0CCR2 += blink_rate_2;
         }
 
-        //fading in/out and breathing, part 1, can be 19, 20, or 21
-        if(((led2_fade_in >= 19) && (led2_fade_in <= 21)) || ((led2_fade_out >= 19) && (led2_fade_out <= 21)) || ((led2_breath >= 19) && (led2_breath <= 21))){
-            if(counter_val_2 < brightness_2){
-                P1OUT |= BIT6;                              //Turn on light
-            } else {
-                P1OUT &= ~BIT6;
-            }
-            counter_val_2 += 1;                             //Increment the value to read from the array
-
-            if(counter_val_2 >= max_brightness){                       //reached max value, reset
-                counter_val_2 = 0;
-            }
-            TA0CCR2 += change_period;
-        }
-
         //fade in part 2
-        if((led2_fade_in == 11) || (led2_fade_in == 15)) {
+        if(led2_fade_in == 10) {
             if(light_flag_2 == 0){
                 brightness_2 += 1;                //increase brightness
             }
@@ -1651,7 +1482,7 @@ __interrupt void Timer0_A1(void){
         }
 
         //fade out part 2
-        if((led2_fade_out == 11) || (led2_fade_out == 15)) {
+        if(led2_fade_out == 10) {
             if(light_flag_2 == 1) {
                 brightness_2 -= 1;                //decrease brightness
             }
@@ -1665,7 +1496,7 @@ __interrupt void Timer0_A1(void){
         }
 
         //breathing part 2
-        if((led2_breath == 11) || (led2_breath == 15)){
+        if(led2_breath == 10){
             if(light_flag_2 == 0){
                 brightness_2 += 1;                //increase brightness
             } else {
@@ -1716,23 +1547,9 @@ __interrupt void Timer0_A1(void){
                 TA0CCR2 += blink_rate_3;
             }
         }
-        //fading in/out and breathing, part 1, can be 19, 20, or 21
-        if(((led3_fade_in >= 19) && (led3_fade_in <= 21)) || ((led3_fade_out >= 19) && (led3_fade_out <= 21)) || ((led3_breath >= 19) && (led3_breath <= 21))){
-            if(counter_val_3 < brightness_3){
-                P2OUT |= colours[colour];                              //Turn on light
-            } else {
-                P2OUT &= ~(BIT1 + BIT3 + BIT5);
-            }
-            counter_val_3 += 1;                             //Increment the value to read from the array
-
-            if(counter_val_3 >= max_brightness){                       //reached max value, reset
-                counter_val_3 = 0;
-            }
-            TA0CCR2 += change_period;
-        }
 
         //fade in part 2
-        if((led3_fade_in == 11) || (led3_fade_in == 15)) {
+        if(led3_fade_in == 10) {
             if(light_flag_3 == 0){
                 brightness_3 += 1;                //increase brightness
             }
@@ -1746,7 +1563,7 @@ __interrupt void Timer0_A1(void){
         }
 
         //fade out part 2
-        if((led3_fade_out == 11) || (led3_fade_out == 15)) {
+        if(led3_fade_out == 10) {
             if(light_flag_3 == 1) {
                 brightness_3 -= 1;                //decrease brightness
             }
@@ -1760,7 +1577,7 @@ __interrupt void Timer0_A1(void){
         }
 
         //breathing part 2
-        if((led3_breath == 11) || (led3_breath == 15)){
+        if(led3_breath == 10){
             if(light_flag_3 == 0){
                 brightness_3 += 1;                //increase brightness
             } else {
@@ -1872,7 +1689,7 @@ __interrupt void Timer1_A0 (void)
              P1OUT ^= BIT6;
              //offset TA0CCR0 by the count number/period
              //change the value held in the array
-             timers_used[0] = count_b;
+             timers_used[0][0] = count_b;
              TA1CCR0 += count_b;
 
         } else {
@@ -1903,7 +1720,7 @@ __interrupt void Timer1_A0 (void)
              pressed2 = 0;                        //reset pressed
              held2 = 1;                           //Button is being held
              //change the value held in the array
-             timers_used[0] = count_b2;
+             timers_used[0][0] = count_b2;
              TA1CCR0 += count_b2;
 
         } else {
@@ -1936,8 +1753,8 @@ __interrupt void Timer1_A0 (void)
         TA1CCR0 += blink_rate_1;
     }
 
-    //fading in/out and breathing, part 1, can be 22 or 23
-    if(((led1_fade_in == 22) || (led1_fade_in == 23)) || ((led1_fade_out == 22) || (led1_fade_out == 23)) || ((led1_breath == 22) || (led1_breath == 23))){
+    //fading in/out and breathing, part 1, can be 11 or 12
+    if(((led1_fade_in == 11) || (led1_fade_in == 12)) || ((led1_fade_out == 11) || (led1_fade_out == 12)) || ((led1_breath == 11) || (led1_breath == 12))){
         if(counter_val_1 < brightness_1){
             P1OUT |= BIT0;                              //Turn on light
         } else {
@@ -1951,50 +1768,6 @@ __interrupt void Timer1_A0 (void)
         TA1CCR0 += change_period;
     }
 
-    //fade in part 2
-    if((led1_fade_in == 12) || (led1_fade_in == 16) || (led1_fade_in == 19)) {
-        if(light_flag_1 == 0){
-            brightness_1 += 1;                //increase brightness
-        }
-
-        if(brightness_1 == max_brightness){               //if max brightness
-            P1OUT |= BIT0;             //leave it on
-            led1_fade_in = -1;          //completed task
-        }
-
-        TA1CCR0 += period_1;
-    }
-
-    //fade out part 2
-    if((led1_fade_out == 12) || (led1_fade_out == 16) || (led1_fade_out == 19)) {
-        if(light_flag_1 == 1) {
-            brightness_1 -= 1;                //decrease brightness
-        }
-
-         if (brightness_1 == 0) {       //reached lowest value
-            P1OUT &= ~BIT0;                 //keep light off
-            led1_fade_out = -1;          //completed task, deactivate it
-        }
-
-        TA1CCR0 += period_1;
-    }
-
-    //breathing part 2
-    if((led1_breath == 12) || (led1_breath == 16) || (led1_breath == 19)){
-        if(light_flag_1 == 0){
-            brightness_1 += 1;                //increase brightness
-        } else {
-            brightness_1 -= 1;                //decrease brightness
-        }
-
-        if(brightness_1 == max_brightness){               //if max brightness
-            light_flag_1 = 1;                //set to decrease
-        } else if (brightness_1 == 0) {       //reached lowest value
-            light_flag_1 = 0;                //increase light
-        }
-
-        TA1CCR0 += period_1;
-    }
 
     //LED2 blinking
     if(led2_blink == 3){
@@ -2002,8 +1775,8 @@ __interrupt void Timer1_A0 (void)
         TA1CCR0 += blink_rate_2;
     }
 
-    //fading in/out and breathing, part 1, can be 22 or 23
-    if(((led2_fade_in == 22) || (led2_fade_in == 23)) || ((led2_fade_out == 22) || (led2_fade_out == 23)) || ((led2_breath == 22) || (led2_breath == 23))){
+    //fading in/out and breathing, part 1, can be 11 or 12
+    if(((led2_fade_in == 11) || (led2_fade_in == 12)) || ((led2_fade_out == 11) || (led2_fade_out == 12)) || ((led2_breath == 11) || (led2_breath == 12))){
         if(counter_val_2 < brightness_2){
             P1OUT |= BIT6;                              //Turn on light
         } else {
@@ -2015,51 +1788,6 @@ __interrupt void Timer1_A0 (void)
             counter_val_2 = 0;
         }
         TA1CCR0 += change_period;
-    }
-
-    //fade in part 2
-    if((led2_fade_in == 12) || (led2_fade_in == 16) || (led2_fade_in == 19)) {
-        if(light_flag_2 == 0){
-            brightness_2 += 1;                //increase brightness
-        }
-
-        if(brightness_2 == max_brightness){               //if max brightness
-            P1OUT |= BIT6;             //leave it on
-            led2_fade_in = -1;          //completed task
-        }
-
-        TA1CCR0 += period_2;
-    }
-
-    //fade out part 2
-    if((led2_fade_out == 12) || (led2_fade_out == 16) || (led2_fade_out == 19)) {
-        if(light_flag_2 == 1) {
-            brightness_2 -= 1;                //decrease brightness
-        }
-
-         if (brightness_2 == 0) {       //reached lowest value
-            P1OUT &= ~BIT6;                 //keep light off
-            led2_fade_out = -1;          //completed task, deactivate it
-        }
-
-        TA1CCR0 += period_2;
-    }
-
-    //breathing part 2
-    if((led2_breath == 12) || (led2_breath == 16) || (led2_breath == 19)){
-        if(light_flag_2 == 0){
-            brightness_2 += 1;                //increase brightness
-        } else {
-            brightness_2 -= 1;                //decrease brightness
-        }
-
-        if(brightness_2 == max_brightness){               //if max brightness
-            light_flag_2 = 1;                //set to decrease
-        } else if (brightness_2 == 0) {       //reached lowest value
-            light_flag_2 = 0;                //increase light
-        }
-
-        TA1CCR0 += period_2;
     }
 
     //LED3 rotating
@@ -2097,8 +1825,8 @@ __interrupt void Timer1_A0 (void)
         }
     }
 
-    //fading in/out and breathing, part 1, can be 22 or 23
-    if(((led3_fade_in == 22) || (led3_fade_in == 23)) || ((led3_fade_out == 22) || (led3_fade_out == 23)) || ((led3_breath == 22) || (led3_breath == 23))){
+    //fading in/out and breathing, part 1, can be 11 or 12
+    if(((led3_fade_in == 11) || (led3_fade_in == 12)) || ((led3_fade_out == 11) || (led3_fade_out == 12)) || ((led3_breath == 11) || (led3_breath == 12))){
         if(counter_val_3 < brightness_3){
             P2OUT |= colours[colour];                              //Turn on light
         } else {
@@ -2112,60 +1840,8 @@ __interrupt void Timer1_A0 (void)
         TA1CCR0 += change_period;
     }
 
-    //fade in part 2
-    if((led3_fade_in == 12) || (led3_fade_in == 16) || (led3_fade_in == 19)) {
-        if(light_flag_3 == 0){
-            brightness_3 += 1;                //increase brightness
-        }
 
-        if(brightness_3 == max_brightness){               //if max brightness
-            P2OUT |= colours[colour];             //leave it on
-            led3_fade_in = -1;          //completed task
-        }
-
-        TA1CCR0 += period_3;
-    }
-
-    //fade out part 2
-    if((led3_fade_out == 12) || (led3_fade_out == 16) || (led3_fade_out == 19)) {
-        if(light_flag_3 == 1) {
-            brightness_3 -= 1;                //decrease brightness
-        }
-
-         if (brightness_3 == 0) {       //reached lowest value
-            P2OUT &= ~(BIT1 + BIT3 + BIT5);                 //keep light off
-            led3_fade_out = -1;          //completed task, deactivate it
-        }
-
-        TA1CCR0 += period_3;
-    }
-
-    //breathing part 2
-    if((led3_breath == 12) || (led3_breath == 16) || (led3_breath == 19)){
-        if(light_flag_3 == 0){
-            brightness_3 += 1;                //increase brightness
-        } else {
-            brightness_3 -= 1;                //decrease brightness
-        }
-
-        if(brightness_3 == max_brightness){               //if max brightness
-            light_flag_3 = 1;                //set to decrease
-        } else if (brightness_3 == 0) {       //reached lowest value
-            light_flag_3 = 0;                //increase light
-            //change colour
-            //verify boundaries
-            if ((colour == 0) && (led3_dir == -1)){
-                colour = 6;
-            } else if ((colour == 6) && (led3_dir == 1)){
-                colour = 0;
-            } else {
-                colour = colour + led3_dir; //change colour based on direction
-            }
-        }
-
-        TA1CCR0 += period_3;
-    }
-
+    //Buzzer
     if(buzzer_tone == 3){
         buzzer_count += 1;  //increment count
         //alternate the pins
@@ -2247,7 +1923,7 @@ __interrupt void Timer1_A1(void){
                  P1OUT ^= BIT6;
                  //offset TA0CCR0 by the count number/period
                  //change the value held in the array
-                 timers_used[0] = count_b;
+                 timers_used[0][0] = count_b;
                  TA1CCR1 += count_b;
 
             } else {
@@ -2278,7 +1954,7 @@ __interrupt void Timer1_A1(void){
                  pressed2 = 0;                        //reset pressed
                  held2 = 1;                           //Button is being held
                  //change the value held in the array
-                 timers_used[0] = count_b2;
+                 timers_used[0][0] = count_b2;
                  TA1CCR1 += count_b2;
 
             } else {
@@ -2294,8 +1970,8 @@ __interrupt void Timer1_A1(void){
             TA1CCR1 += blink_rate_1;
         }
 
-        //fading in/out and breathing, part 1, can be 24
-        if((led1_fade_in == 22) || (led1_fade_out == 24) || (led1_breath == 24)){
+        //fading in/out and breathing, part 1, can be 13
+        if((led1_fade_in == 13) || (led1_fade_out == 13) || (led1_breath == 13)){
             if(counter_val_1 < brightness_1){
                 P1OUT |= BIT0;                              //Turn on light
             } else {
@@ -2310,7 +1986,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //fade in part 2
-        if((led1_fade_in == 13) || (led1_fade_in == 17) || (led1_fade_in == 20) || (led1_fade_in == 22)) {
+        if(led1_fade_in == 11) {
             if(light_flag_1 == 0){
                 brightness_1 += 1;                //increase brightness
             }
@@ -2324,7 +2000,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //fade out part 2
-        if((led1_fade_out == 13) || (led1_fade_out == 17) || (led1_fade_out == 20) || (led1_fade_out == 22)) {
+        if(led1_fade_out == 11) {
             if(light_flag_1 == 1) {
                 brightness_1 -= 1;                //decrease brightness
             }
@@ -2338,7 +2014,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //breathing part 2
-        if((led1_breath == 13) || (led1_breath == 17) || (led1_breath == 20) || (led1_breath == 22)){
+        if(led1_breath == 11){
             if(light_flag_1 == 0){
                 brightness_1 += 1;                //increase brightness
             } else {
@@ -2360,8 +2036,8 @@ __interrupt void Timer1_A1(void){
             TA1CCR1 += blink_rate_2;
         }
 
-        //fading in/out and breathing, part 1, can be 24
-        if((led2_fade_in == 22) || (led2_fade_out == 24) || (led2_breath == 24)){
+        //fading in/out and breathing, part 1, can be 13
+        if((led2_fade_in == 13) || (led2_fade_out == 13) || (led2_breath == 13)){
             if(counter_val_2 < brightness_2){
                 P1OUT |= BIT6;                              //Turn on light
             } else {
@@ -2376,7 +2052,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //fade in part 2
-        if((led2_fade_in == 13) || (led2_fade_in == 17) || (led2_fade_in == 20) || (led2_fade_in == 22)) {
+        if(led2_fade_in == 11) {
             if(light_flag_2 == 0){
                 brightness_2 += 1;                //increase brightness
             }
@@ -2390,7 +2066,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //fade out part 2
-        if((led2_fade_out == 13) || (led2_fade_out == 17) || (led2_fade_out == 20) || (led2_fade_out == 22)) {
+        if(led2_fade_out == 11) {
             if(light_flag_2 == 1) {
                 brightness_2 -= 1;                //decrease brightness
             }
@@ -2404,7 +2080,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //breathing part 2
-        if((led2_breath == 13) || (led2_breath == 17) || (led2_breath == 20) || (led2_breath == 22)){
+        if(led2_breath == 11){
             if(light_flag_2 == 0){
                 brightness_2 += 1;                //increase brightness
             } else {
@@ -2455,8 +2131,8 @@ __interrupt void Timer1_A1(void){
             }
         }
 
-        //fading in/out and breathing, part 1, can be 24
-        if((led3_fade_in == 22) || (led3_fade_out == 24) || (led3_breath == 24)){
+        //fading in/out and breathing, part 1, can be 13
+        if((led3_fade_in == 13) || (led3_fade_out == 13) || (led3_breath == 13)){
             if(counter_val_3 < brightness_3){
                 P2OUT |= colours[colour];                              //Turn on light
             } else {
@@ -2471,7 +2147,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //fade in part 2
-        if((led3_fade_in == 13) || (led3_fade_in == 17) || (led3_fade_in == 20) || (led3_fade_in == 22)) {
+        if(led3_fade_in == 11) {
             if(light_flag_3 == 0){
                 brightness_3 += 1;                //increase brightness
             }
@@ -2485,7 +2161,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //fade out part 2
-        if((led3_fade_out == 13) || (led3_fade_out == 17) || (led3_fade_out == 20) || (led3_fade_out == 22)) {
+        if(led3_fade_out == 11) {
             if(light_flag_3 == 1) {
                 brightness_3 -= 1;                //decrease brightness
             }
@@ -2499,7 +2175,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //breathing part 2
-        if((led3_breath == 13) || (led3_breath == 17) || (led3_breath == 20) || (led3_breath == 22)){
+        if(led3_breath == 11){
             if(light_flag_3 == 0){
                 brightness_3 += 1;                //increase brightness
             } else {
@@ -2600,7 +2276,7 @@ __interrupt void Timer1_A1(void){
                  P1OUT ^= BIT6;
                  //offset TA0CCR0 by the count number/period
                  //change the value held in the array
-                 timers_used[0] = count_b;
+                 timers_used[0][0] = count_b;
                  TA1CCR2 += count_b;
 
             } else {
@@ -2632,7 +2308,7 @@ __interrupt void Timer1_A1(void){
                  held2 = 1;                           //Button is being held
 
                  //change the value held in the array
-                 timers_used[0] = count_b2;
+                 timers_used[0][0] = count_b2;
                  TACCR2 += count_b2;
 
             } else {
@@ -2665,7 +2341,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //fade in part 2
-        if((led1_fade_in == 14) || (led1_fade_in == 18) || (led1_fade_in == 21) || (led1_fade_in == 23) || (led1_fade_in == 24)) {
+        if((led1_fade_in == 12) || (led1_fade_in == 13)) {
             if(light_flag_1 == 0){
                 brightness_1 += 1;                //increase brightness
             }
@@ -2679,7 +2355,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //fade out part 2
-        if((led1_fade_out == 14) || (led1_fade_out == 18) || (led1_fade_out == 21) || (led1_fade_out == 23) || (led1_fade_out == 24)) {
+        if((led1_fade_out == 12) || (led1_fade_out == 13)) {
             if(light_flag_1 == 1) {
                 brightness_1 -= 1;                //decrease brightness
             }
@@ -2693,7 +2369,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //breathing part 2
-        if((led1_breath == 14) || (led1_breath == 18) || (led1_breath == 21) || (led1_breath == 23) || (led1_breath == 24)){
+        if((led1_breath == 12) || (led1_breath == 13)){
             if(light_flag_1 == 0){
                 brightness_1 += 1;                //increase brightness
             } else {
@@ -2716,7 +2392,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //fade in part 2
-        if((led2_fade_in == 14) || (led2_fade_in == 18) || (led2_fade_in == 21) || (led2_fade_in == 23) || (led2_fade_in == 24)) {
+        if((led2_fade_in == 12) || (led2_fade_in == 13)) {
             if(light_flag_2 == 0){
                 brightness_2 += 1;                //increase brightness
             }
@@ -2730,7 +2406,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //fade out part 2
-        if((led2_fade_out == 14) || (led2_fade_out == 18) || (led2_fade_out == 21) || (led2_fade_out == 23) || (led2_fade_out == 24)) {
+        if((led2_fade_out == 12) || (led2_fade_out == 13)) {
             if(light_flag_2 == 1) {
                 brightness_2 -= 1;                //decrease brightness
             }
@@ -2744,7 +2420,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //breathing part 2
-        if((led2_breath == 14) || (led2_breath == 18) || (led2_breath == 21) || (led2_breath == 23) || (led2_breath == 24)){
+        if((led2_breath == 12) || (led2_breath == 13)){
             if(light_flag_2 == 0){
                 brightness_2 += 1;                //increase brightness
             } else {
@@ -2795,7 +2471,7 @@ __interrupt void Timer1_A1(void){
             }
         }
         //fade in part 2
-        if((led3_fade_in == 14) || (led3_fade_in == 18) || (led3_fade_in == 21) || (led3_fade_in == 23) || (led3_fade_in == 24)) {
+        if((led3_fade_in == 12) || (led3_fade_in == 13)) {
             if(light_flag_3 == 0){
                 brightness_3 += 1;                //increase brightness
             }
@@ -2809,7 +2485,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //fade out part 2
-        if((led3_fade_out == 14) || (led3_fade_out == 18) || (led3_fade_out == 21) || (led3_fade_out == 23) || (led3_fade_out == 24)) {
+        if((led3_fade_out == 12) || (led3_fade_out == 13)) {
             if(light_flag_3 == 1) {
                 brightness_3 -= 1;                //decrease brightness
             }
@@ -2823,7 +2499,7 @@ __interrupt void Timer1_A1(void){
         }
 
         //breathing part 2
-        if((led3_breath == 14) || (led3_breath == 18) || (led3_breath == 21) || (led3_breath == 23) || (led3_breath == 24)){
+        if((led3_breath == 12) || (led3_breath == 13)){
             if(light_flag_3 == 0){
                 brightness_3 += 1;                //increase brightness
             } else {
@@ -2965,38 +2641,23 @@ __interrupt void Port_1(void){
 
 //Helper functions
 //function for activating a specific timer
-int activate_timer(int timer_no, int count1, int count2){
+int activate_timer(int timer_no, int count){
     if(timer_no == 0){
         TA0CTL = TASSEL_1 + MC_2 + TAIE;          // ACLK, continuous mode, interrupt enabled
         TA0CCTL0 |= CCIE;                         // TA0CCR0 interrupt enabled
-        if(count2 > 0){
-            TA0CCTL1 |= CCIE;                         // TA0CCR1 interrupt enabled
-            TA0CCR0 = count1;
-            TA0CCR1 = count2;
-            //set them to being used
-            timers_used[0] = count1;
-            timers_used[1] = count2;
-        } else {
-            TA0CCR0 = count1;
+        TA0CCR0 = count;
 
-            timers_used[0] = count1;
-        }
+        timers_used[0][0] = count;
+        timers_used[1][0] = 1;
         timer0_activated = 1;
         return 1;
     } else if (timer_no == 1){
         TA1CTL = TASSEL_1 + MC_2 + TAIE;          // ACLK, continuous mode, interrupt enabled
         TA1CCTL0 |= CCIE;
-        if(count2 > 0){
-            TA1CCTL1 |= CCIE;
-            TA1CCR0 = count1;
-            TA1CCR1 = count2;
 
-            timers_used[3] = count1;
-            timers_used[4] = count2;
-        } else {
-            TA1CCR0 = count1;
-            timers_used[3] = count1;
-        }
+        TA1CCR0 = count;
+        timers_used[0][3] = count;
+        timers_used[1][3] = 1;
 
         timer1_activated = 1;
         return 1;
@@ -3006,163 +2667,353 @@ int activate_timer(int timer_no, int count1, int count2){
 
 }
 
-//function for checking which timer is free,
-int activate_free_timer(int registers, int counts[]){
+///fix this
+//function for checking which timer is free, if alone is 1 then the timer needs to be on its own
+int activate_free_timer(int registers, int counts[], int alone){
     //check which registers are free, if less than the register amount, return error
-    int free[6] = {};
+    int potential[2] = {}; //potential registers, second row is the value held in the register
+    int to_activate[2] = {0, 0}; //registers to activate
     unsigned int index = 0;
-    unsigned int i;
-    for(i=0; i < 6; i++){
-       if((timers_used[i] == 0) ){ //could potentially add in || (timers_used[i] == counts[index]) but would cause deactivation issues
-           free[index] = i;
-           index++;
-       }
+    unsigned int i, r;
 
-    }
-    //reset activated timers
-    activated_timers[0] = -1;
-    activated_timers[1] = -1;
+    //check how many registers there are, currently max is 2
+    if(registers == 1) {
+        //loop through and look first for registers with the same counts, unless the timer should be alone
+        if(alone) {
+            for(i=0; i<5; i++){
+                if(timers_used[0][i] == 0){
+                   to_activate[0] = i;
+                   index = 1; //found one
+                   break; //no need to look for others
+               }
+            }
 
-
-    if(index < registers){
-        //return error
-        return 0;
-    } else { //right number was found, activate them
-        for (i=0; i < registers; i++){
-            switch (free[i]){
-            case 0:
-                //activate register A0_0, check if A0 is already active
-                if(!timer0_activated){
-                    activate_timer(0, counts[i], 0);
-                } else if(timers_used[0] == 0) {
-                    TA0CCTL0 |= CCIE;
-                    TA0CCR0 = counts[i];
-                } //if timer was used continue
-
-                //set it as active
-                timers_used[0] = counts[i];
-                //set it as activated
-                activated_timers[i] = 0;
-                break;
-            case 1:
-                //activate A0_1
-                //if A0_0 wasn't available then A0 was already activated so don't need to check again
-                if(timers_used[1] == 0){
-                    TA0CCTL1 |= CCIE;
-                    TA0CCR1 = counts[i];
+            //check that one was actually found
+            if(index == 0) {
+                //error
+                return 0;
+            } //else its fine, just continue
+        } else { //can look for evidence of same register value, if free
+            for(i=0; i<5; i++){
+                //check that the timer is available for others
+               if((timers_used[0][i] == counts[0]) && (timers_used[1][i] != -1)){
+                  to_activate[0] = 1;
+                  index = 1;
+                  break; //break out as one was found
+               }
+            }
+            //if none was found, check for free ones
+            if(index == 0) {
+                for(i=0; i<5; i++){
+                    //check for first free timer
+                   if(timers_used[0][i] == 0){
+                      to_activate[0] = 1;
+                      index = 1;
+                      break; //break out as one was found
+                   }
                 }
-                //set it as active
-                timers_used[1] = counts[i];
-                //set it as activated
-                activated_timers[i] = 1;
-                break;
-            case 2:
-                //activate A0_2
-                if(timers_used[2] == 0){
-                    TA0CCTL2 |= CCIE;
-                    TA0CCR2 = counts[i];
-                }
-                //set it as active
-                timers_used[2] = counts[i];
-                //set it as activated
-                activated_timers[i] = 2;
-                break;
-            case 3:
-                //activate A1_0check if A1 is already active
-                if(!timer1_activated){
-                    activate_timer(1, counts[i], 0);
-                } else if(timers_used[3] == 0) {
-                    TA1CCTL0 |= CCIE;
-                    TA1CCR0 = counts[i];
-                }
-                //set it as active
-                timers_used[3] = counts[i];
-                //set it as activated
-                activated_timers[i] = 3;
-                break;
-            case 4:
-                //activate A1_1
-                if(timers_used[4] == 0){
-                   TA1CCTL1 |= CCIE;
-                   TA1CCR1 = counts[i];
-                }
-
-                //set it as active
-                timers_used[4] = counts[i];
-                //set it as activated
-                activated_timers[i] = 4;
-                break;
-            case 5:
-                //activate A1_2
-                if(timers_used[4] == 0){
-                    TA1CCTL2 |= CCIE;
-                    TA1CCR2 = counts[i];
-                }
-                //set it as active
-                timers_used[5] = counts[i];
-                //set it as activated
-                activated_timers[i] = 5;
-                break;
-            default:
+            }
+            //check that one was actually found, otherwise return 0
+            if(index == 0){
                 return 0;
             }
         }
-        return 1;
+
+    } else if (registers == 2){ //shouldn't have any that needs to be alone
+        //check registers for ones with same period
+        for(r=0; r<2; r++){
+            for(i=0; i<5; i++){
+                //check that the timer is available for others
+               if((timers_used[0][i] == counts[r]) && (timers_used[1][i] != -1)){
+                   if(r == 0){ //if first register
+                       //need to verify that it is either 1, 3, or 4
+                       if((i == 1) || (i == 3) || (i == 4)){
+                           potential[0] = i;
+                           index++;
+                           break; //break out as one was found
+                       } //if not invalid option
+                   } else {
+                       //need to verify that it is either 2, 4, or 5
+                      if((i == 2) || (i == 4) || (i == 5)){
+                          potential[1] = i;
+                          index++;
+                          break; //break out as one was found
+                      } //if not invalid option
+                   }
+               }
+            }
+            //if none were found check for free one
+            if(r == 0) {
+                if(index == 0){
+                    for(i=0; i<5; i++){
+                       if(timers_used[0][i] == 0){
+                           if((i == 1) || (i == 3) || (i == 4)){
+                              potential[0] = i;
+                              index++;
+                              break; //break out as one was found
+                          } //if not, invalid option
+                       }
+                    }
+                }
+            } else {
+                if(index == 1){
+                    for(i=0; i<5; i++){
+                       if(timers_used[0][i] == 0){
+                           //also need to check what the first potential one
+                           if(potential[0] == 1){
+                               if(i == 2){
+                                   potential[1] = i;
+                                   index++;
+                                   break; //break out as one was found
+                               }
+                           } else if(potential[0] == 3){
+                               if((i == 4) || (i == 5)){
+                                   potential[1] = i;
+                                   index++;
+                                   break; //break out as one was found
+                               }
+
+                          } else if(potential[0] == 4){
+                              if(i == 5){
+                                  potential[1] = i;
+                                  index++;
+                                  break; //break out as one was found
+                              }
+                          }
+                       }
+                    }
+                }
+            }
+        }
+
+        //need to verify that 2 was found
+        if(index != 2){
+            return 0;
+        } else { //if 2 were actually found then verify them
+            //allowed combo: 1+2, 3+4, 3+5, 4+5
+            if(potential[0] == 1){
+                if(potential[1] == 2){
+                    to_activate[0] = 1;
+                    to_activate[1] = 2;
+                } else {
+                    return 0; //no valid match
+                }
+            } else if(potential[0] == 3){
+                if(potential[1] == 4){
+                    to_activate[0] = 3;
+                    to_activate[1] = 4;
+                } else if(potential[1] == 5) {
+                    to_activate[0] = 3;
+                    to_activate[1] = 5;
+                } else {
+                    //invalid match
+                    return 0;
+                }
+            } else if(potential[0] == 4){
+                if(potential[1] == 5){
+                    to_activate[0] = 4;
+                    to_activate[1] = 5;
+                } else {
+                    //invalid combo
+                    return 0;
+                }
+            } else {
+                //something went wrong, should actually never reach this
+                return 0;
+            }
+
+        }
+
     }
 
-}
+    //if reached here then its fine
 
+    ///reset activated timers
+    activated_timers[0] = -1;
+    activated_timers[1] = -1;
+
+    //activate them
+    for (i=0; i < registers; i++){
+        //need to ensure that if more than 1 register are needed that they are from the same timer
+        switch (to_activate[i]){
+        case 0: //should never be reached, reserved timer
+            return 0;
+        case 1:
+            //activate A0_1
+            //if A0_0 wasn't available then A0 was already activated so don't need to check again
+            if(timers_used[0][1] == 0){
+                TA0CCTL1 |= CCIE;
+                TA0CCR1 = counts[i];
+            }
+            //set it as active
+            timers_used[0][1] = counts[i];
+            //update count
+            if(alone){
+                timers_used[1][1] = -1;
+            } else {
+                timers_used[1][1] = timers_used[1][1] + 1;
+            }
+            //set it as activated
+            activated_timers[i] = 1;
+            break;
+        case 2:
+            //activate A0_2
+            if(timers_used[0][2] == 0){
+                TA0CCTL2 |= CCIE;
+                TA0CCR2 = counts[i];
+            }
+            //set it as active
+            timers_used[0][2] = counts[i];
+            //update count
+            if(alone){
+                timers_used[1][2] = -1;
+            } else {
+                timers_used[1][2] = timers_used[1][2] + 1;
+            }
+            //set it as activated
+            activated_timers[i] = 2;
+            break;
+        case 3:
+            //activate A1_0check if A1 is already active
+            if(!timer1_activated){
+                activate_timer(1, counts[i]);
+            } else if(timers_used[0][3] == 0) {
+                TA1CCTL0 |= CCIE;
+                TA1CCR0 = counts[i];
+            }
+            //set it as active
+            timers_used[0][3] = counts[i];
+            //update count
+            if(alone){
+                timers_used[1][3] = -1;
+            } else {
+                timers_used[1][3] = timers_used[1][3] + 1;
+            }
+            //set it as activated
+            activated_timers[i] = 3;
+            break;
+        case 4:
+            //activate A1_1
+            if(timers_used[0][4] == 0){
+               TA1CCTL1 |= CCIE;
+               TA1CCR1 = counts[i];
+            }
+
+            //set it as active
+            timers_used[0][4] = counts[i];
+            //update count
+            if(alone){
+                timers_used[1][4] = -1;
+            } else {
+                timers_used[1][4] = timers_used[1][4] + 1;
+            }
+            //set it as activated
+            activated_timers[i] = 4;
+            break;
+        case 5:
+            //activate A1_2
+            if(timers_used[0][5] == 0){
+                TA1CCTL2 |= CCIE;
+                TA1CCR2 = counts[i];
+            }
+            //set it as active
+            timers_used[0][5] = counts[i];
+            //update count
+            if(alone){
+                timers_used[1][5] = -1;
+            } else {
+                timers_used[1][5] = timers_used[1][5] + 1;
+            }
+            //set it as activated
+            activated_timers[i] = 5;
+            break;
+        default:
+            return 0;
+        }
+    }
+    //success
+    return 1;
+
+}
+//TODO: Fix this
 //function to turn off the timers activated - or set the count value to 0, check if each value is now zero so the full timer should be turned off
 void deactivate_timer(int activated[], int len){
     unsigned int i;
     for(i=0; i < len; i++){
         int deactivate = activated[i];
+        //need to ensure that the timer isn't used by others, and need to see if it is designated as alone
+        //so check for > 0, as -1 needs to be set to 0 as well
 
         switch (deactivate){ //deactivate specific timer count register
         case 0:
-            TA0CCR0 = 0;
-            timers_used[0] = 0;
+            if(timers_used[1][0] > 0){ //assuming at least 1 as it will be deactivated
+                //reduce by 1
+                timers_used[1][0] = timers_used[1][0] - 1;
+            } else {
+                TA0CCR0 = 0;
+                timers_used[0][0] = 0;
+                timers_used[1][0] = 0;
+            }
             break;
         case 1:
-            TA0CCR1 = 0;
-            timers_used[1] = 0;
+            if(timers_used[1][1] > 0){ //assuming at least 1 as it will be deactivated
+                //reduce by 1
+                timers_used[1][1] = timers_used[1][1] - 1;
+            } else {
+                TA0CCR1 = 0;
+                timers_used[0][1] = 0;
+                timers_used[1][1] = 0;
+            }
             break;
         case 2:
-            TA0CCR2 = 0;
-            timers_used[2] = 0;
+            if(timers_used[1][2] > 1){ //assuming at least 1 as it will be deactivated
+                //reduce by 1
+                timers_used[1][2] = timers_used[1][2] - 1;
+            } else {
+                TA0CCR2 = 0;
+                timers_used[0][2] = 0;
+                timers_used[1][2] = 0;
+            }
             break;
         case 3:
-            TA1CCR0 = 0;
-            timers_used[3] = 0;
+            if(timers_used[1][3] > 1){ //assuming at least 1 as it will be deactivated
+                //reduce by 1
+                timers_used[1][3] = timers_used[1][3] - 1;
+            } else {
+                TA1CCR0 = 0;
+                timers_used[0][3] = 0;
+                timers_used[1][3] = 0;
+            }
             break;
         case 4:
-            TA1CCR1 = 0;
-            timers_used[4] = 0;
+            if(timers_used[1][4] > 1){ //assuming at least 1 as it will be deactivated
+                //reduce by 1
+                timers_used[1][4] = timers_used[1][4] - 1;
+            } else {
+                TA1CCR1 = 0;
+                timers_used[0][4] = 0;
+                timers_used[1][4] = 0;
+            }
             break;
         case 5:
-            TA1CCR2 = 0;
-            timers_used[5] = 0;
+            if(timers_used[1][5] > 1){ //assuming at least 1 as it will be deactivated
+                //reduce by 1
+                timers_used[1][5] = timers_used[1][5] - 1;
+            } else {
+                TA1CCR2 = 0;
+                timers_used[0][5] = 0;
+                timers_used[1][5] = 0;
+            }
             break;
+        default:
+            return 0;
         }
-    }
-
-    //check if all timers for A0 are 0
-    int all_0 = 0;
-    for(i=0; i<3; i++){
-        if(timers_used[i] == 0){
-            all_0++;
-        }
-    }
-
-    if(all_0 == 3){
-        TA0CTL = MC_0;      //turn off A0
-        timer0_activated = 0;
     }
 
     //check if all registers for A1 is 0
     int all_1 = 0;
         for(i=3; i<6; i++){
-            if(timers_used[i] == 0){
+            if(timers_used[0][i] == 0){
                 all_1++;
             }
         }
@@ -3179,59 +3030,48 @@ int get_timer_code(int timers[]){
     int second = timers[1];
 
     switch (first){ //check which timer is first
-            case 0:
-                //get second value
-                switch(second){
-                case 1:
-                    return 10;
-                case 2:
-                    return 11;
-                case 3:
-                    return 12;
-                case 4:
-                    return 13;
-                case 5:
-                    return 14;
-                }
-                break;
-            case 1:
-                //get second value
-                switch(second){
-                case 2:
-                    return 15;
-                case 3:
-                    return 16;
-                case 4:
-                    return 17;
-                case 5:
-                    return 18;
-                }
-                break;
-            case 2:
-                //get second value
-                switch(second){
-                case 3:
-                    return 19;
-                case 4:
-                    return 20;
-                case 5:
-                    return 21;
-                }
-                break;
-            case 3:
-                //get second value
-                if(second == 4){
-                    return 22;
-                } else if (second == 5){
-                    return 23;
-                }
-                break;
-            case 4:
-                if(second == 5){
-                    return 24;
-                }
-                break;
-            }
+    //first timers can only be 1, 3, and 4
+    case 1:
+        //get second value, should be 2
+        if(second == 2){
+             return 10;
+        } else {
+            //something went wrong, send error message
+            send_message = 1;
+            send[0][0] = 1;
+            send[1][0] = 1; //generic
+        }
+        break;
+    case 3:
+        //get second value
+        if(second == 4){
+            return 11;
+        } else if (second == 5){
+            return 12;
+        } else {
+            //something went wrong, send error message
+            send_message = 1;
+            send[0][0] = 1;
+            send[1][0] = 1; //generic
+        }
+        break;
+    case 4:
+        if(second == 5){
+            return 13;
+        } else {
+            //something went wrong, send error message
+            send_message = 1;
+            send[0][0] = 1;
+            send[1][0] = 1; //generic
+        }
+        break;
+    default:
+        //something went wrong, send error message
+        send_message = 1;
+        send[0][0] = 1;
+        send[1][0] = 1; //generic
+        break;
+    }
     return 0; //error occurred.
 }
 
