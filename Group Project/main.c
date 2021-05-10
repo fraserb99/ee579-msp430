@@ -28,8 +28,6 @@ unsigned int send_message = 0;                  //flag used to indicate that at 
  *    A0_2 = 10,      A1_1 = 11,      A1_2 = 13,
  *                    A1_2 = 12,
  *
- *
- *
  */
 
 /**inputs
