@@ -6,6 +6,7 @@ targetConfigs
 .cproject
 .project
 lnk_msp430g2553.cmd
+.launch
 
 # Prerequisites
 *.d

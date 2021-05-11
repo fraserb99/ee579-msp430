@@ -1,4 +1,5 @@
-#include <msp430.h> 
+#include <msp430.h>
+#include "../jsmn.h" //For parsing UART commands from JSON format
 
 
 /**
