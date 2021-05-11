@@ -191,7 +191,7 @@ int main(void)
 	//button = 1;
 	//button2 = 1;
 	pot = 1;
-	//thermometer = 1;
+	thermometer = 1;
 	//led1_blink = 1;
 	//blink_rate_3 = 32768;
 	//led3_on = 1;
@@ -402,14 +402,14 @@ int main(void)
         //pot
         //can only run timer or pot
         if (pot > 0){
-            if(t_activated) {
-                //send error message as both can't be active
+            //if(t_activated) {
+/*                //send error message as both can't be active
                 send_message = 1;
                 send[0][0] = 1; //set flag
                 send[1][0] = 3; //clashing rules
                 //disable pot
-                pot = -1;
-            } else {
+                pot = -1;*/
+            //} else {
                 if(!pot_activated){         //if not already activated
                     ADC10CTL0 = ADC10ON + CONSEQ_0 + SREF_0; // ADC10ON, single channel single sample, ref 0
                     ADC10CTL1 = INCH_4 + ADC10SSEL_1;          // input A4, clock = ACLK
@@ -432,20 +432,42 @@ int main(void)
                     }
                 } else {
                     if(sample_pot) {
-                        //TODO: remove comments if the code can work with temp
-                        //ADC10CTL0 |= SREF_0;                    //set ref to 0
-                        //ADC10CTL1 |= INCH_4;                     //Ensure right channel
+                        if(t_activated){ //if temp is used as well
+                            //TODO: remove comments if the code can work with temp
+                            ADC10CTL0 = ADC10ON  + SREF_0;                    //set ref to 0
+                            ADC10CTL1 = INCH_4;                     //Ensure right channel
+                            ADC10AE0 |= BIT4;                          // PA.4 ADC option select
+                            ADC10CTL0 &= ~REFON;
 
-                        ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
-                        //ADC10AE0 |= BIT4;                          // PA.4 ADC option select
-                        //ADC10MEM = conversion result
-                        //wait for result completion, triggers interrupt when done, ADC10Iflag
-                        while ((ADC10CTL1 & ADC10BUSY) == 1) {//check if busy
-                            //Wait for sample to take place
+                            ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
+                            //ADC10MEM = conversion result
+                            //wait for result completion,
+                            /*while ((ADC10CTL1 & ADC10BUSY) == 1) {//check if busy
+                                //Wait for sample to take place
+                            }*/
+                            while ((ADC10CTL0 & ADC10IFG) == 0) {//wait for flag
+                                //Wait for sample to take place
+                            }
+                            value = ADC10MEM;           //Just to make sure the value doesn't change during checking
+                            //disable conversion
+                            ADC10CTL0 &= ~ENC;
+                            //clear flag
+                            ADC10CTL0 &=  ~ADC10IFG;
+
+                        } else {
+
+                            ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
+                            //ADC10MEM = conversion result
+                            //wait for result completion,
+                            while ((ADC10CTL0 & ADC10IFG) == 0) {//wait for flag
+                                //Wait for sample to take place
+                            }
+                            value = ADC10MEM;           //Just to make sure the value doesn't change during checking
+
+                            //clear flag
+                            ADC10CTL0 &=  ~ADC10IFG;
+
                         }
-                        value = ADC10MEM;           //Just to make sure the value doesn't change during checking
-                        //reset ENC
-                        //ADC10CTL0 &= ~ENC;
 
                         if(value != orig_val){ //if value has changed
                             //check by how much
@@ -467,9 +489,8 @@ int main(void)
                         sample_pot = 0;
                     }
                 }
-            }
+            //}
 
-            //Code here for the potentiometer, so basically send stuff at interval checks
         } else if(pot == -1){
             deactivate_timer(activated_pot, 1);
             pot_activated = 0;
@@ -479,23 +500,23 @@ int main(void)
         //check if thermometer was requested
         if(thermometer > 0){
             //check for pot first
-            if(pot_activated){
+            //if(pot_activated){
                 //send error
-                send_message = 1;
-                send[0][0] = 1; //set flag
-                send[1][0] = 3; //clashing rules
+              //  send_message = 1;
+                //send[0][0] = 1; //set flag
+                //send[1][0] = 3; //clashing rules
                 //Disable temp
-                thermometer = -1;
-            } else{
+                //thermometer = -1;
+            //} else{
                 //based on example adc10_temp.c from URL: http://dev.ti.com/tirex/explore/node?node=AEldOKIXgnT979MckUlLRw__IOGqZri__LATEST
                 if(!t_activated){
-                    ADC10CTL0 = ADC10ON + SREF_1 + REFON; // ADC10ON, vr+ = Vref+f, Vr- = Vss, reference on, ref 1
+                    ADC10CTL0 = ADC10ON + SREF_1 + REFON + CONSEQ_0; // ADC10ON, vr+ = Vref+f, Vr- = Vss, reference on, ref 1
                     ADC10CTL1 = INCH_10 + ADC10SSEL_1;    // temp sensor, clock = ACLK
-                    ADC10AE0 |= BIT1;                     // PA.1 ADC option select
+                    //ADC10AE0 |= BIT1;                     // PA.1 ADC option select
 
                     //set up a timer for stabilisation, use A1
-                    //need a 30microsecond delay calculation time was 0.49, putting 10 to test, need only 1 timer
-                    int counts[1] = {10};
+                    //need a 30microsecond delay calculation time was 0.49, putting 30 to test, need only 1 timer
+                    int counts[1] = {30};
                     t_activated = activate_free_timer(1, counts, 0); //single timer, doesn't need to be alone
                     activated_temp[0] = activated_timers[0];      //record which ones were activated
                     thermometer = activated_temp[0];              //Set for proper check in interrupts
@@ -512,19 +533,36 @@ int main(void)
                 }
 
                 if (sample_temp){
-                    //TODO: remove comments to test with pot
-                    //ADC10CTL0 = SREF_1
-                    //ADC10CTL1 = INCH_10
-                    //ADC10AE0 |= BIT1;
-                    ADC10CTL0 |= ENC + ADC10SC;         // Sampling and conversion start
-                    //based on code for pot above
-                    //ADC10MEM = conversion result
-                    while ((ADC10CTL1 & ADC10BUSY) == 1) {//check if busy
-                        //Wait for sample to take place
+                    if(pot_activated){
+                         //TODO: remove comments to test with pot
+                        //if pot is active reset these every time
+                        ADC10CTL0 = ADC10ON + SREF_1 + REFON;
+                        ADC10CTL1 = INCH_10;
+                        ADC10AE0 &= ~BIT4;
+
+                        ADC10CTL0 |= ENC + ADC10SC;         // Sampling and conversion start
+                        //based on code for pot above
+                        while ((ADC10CTL0 & ADC10IFG) == 0) {//wait for flag
+                            //Wait for sample to take place
+                        }
+                        temp = ADC10MEM;           //Just to make sure the value doesn't change during checking
+                        //disable conversion, to allow for reset of values
+                        ADC10CTL0 &= ~ENC;
+                        //clear flag
+                        ADC10CTL0 &= ~ADC10IFG;
+
+                    } else {
+                        ADC10CTL0 |= ENC + ADC10SC;         // Sampling and conversion start
+                        //based on code for pot above
+                        while ((ADC10CTL0 & ADC10IFG) == 0) {//wait for flag
+                            //Wait for sample to take place
+                        }
+                        temp = ADC10MEM;           //Just to make sure the value doesn't change during checking
+
+                        //clear flag
+                        ADC10CTL0 &= ~ADC10IFG;
                     }
-                    temp = ADC10MEM;           //Just to make sure the value doesn't change during checking
-                    //reset ENC
-                    ADC10CTL0 &= ~ENC;
+
                     value_temp = ((temp - 673) * 423) / 1024;
 
                     if(value_temp != orig_temp){ //if value has changed
@@ -546,7 +584,7 @@ int main(void)
                     //set sample to false
                     sample_temp = 0;
                 }
-            }
+            //}
 
         } else if(thermometer == -1){
             t_activated = 0;
@@ -2855,7 +2893,7 @@ int activate_free_timer(int registers, int counts[], int alone){
             for(i=0; i<5; i++){
                 //check that the timer is available for others
                if((timers_used[0][i] == counts[0]) && (timers_used[1][i] != -1)){
-                  to_activate[0] = 1;
+                  to_activate[0] = i;
                   index = 1;
                   break; //break out as one was found
                }
@@ -2865,7 +2903,7 @@ int activate_free_timer(int registers, int counts[], int alone){
                 for(i=0; i<5; i++){
                     //check for first free timer
                    if(timers_used[0][i] == 0){
-                      to_activate[0] = 1;
+                      to_activate[0] = i;
                       index = 1;
                       break; //break out as one was found
                    }
