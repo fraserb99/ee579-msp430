@@ -1450,6 +1450,25 @@ __interrupt void Timer0_A1(void){
 
          }
 
+        //pot stuff
+        if(pot == 2){
+            if (!stable_pot){
+
+                //get original value, if possible here
+                ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
+                orig_val = ADC10MEM;
+
+                //update timer value
+                timers_used[0][2] = sample_time;
+                stable_pot = 1;
+
+            } else {
+                sample_pot = 1;        //start a sample
+            }
+
+            TA0CCR2 += sample_time;
+        }
+
 
         //thermometer stuff
         if(thermometer == 2){
@@ -1791,6 +1810,25 @@ __interrupt void Timer1_A0 (void)
 
      }
 
+    //pot stuff
+    if(pot == 3){
+        if (!stable_pot){
+
+            //get original value, if possible here
+            ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
+            orig_val = ADC10MEM;
+
+            //update timer value
+            timers_used[0][3] = sample_time;
+            stable_pot = 1;
+
+        } else {
+            sample_pot = 1;        //start a sample
+        }
+
+        TA1CCR0 += sample_time;
+    }
+
 
     //thermometer stuff
     if(thermometer == 3){
@@ -2027,6 +2065,25 @@ __interrupt void Timer1_A1(void){
             }
 
          }
+
+        //pot stuff
+        if(pot == 4){
+            if (!stable_pot){
+
+                //get original value, if possible here
+                ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
+                orig_val = ADC10MEM;
+
+                //update timer value
+                timers_used[0][4] = sample_time;
+                stable_pot = 1;
+
+            } else {
+                sample_pot = 1;        //start a sample
+            }
+
+            TA1CCR1 += sample_time;
+        }
 
         //thermometer stuff
         if(thermometer == 4){
@@ -2394,13 +2451,33 @@ __interrupt void Timer1_A1(void){
 
                  //change the value held in the array
                  timers_used[0][5] = count_b2;
-                 TACCR2 += count_b2;
+                 TA1CCR2 += count_b2;
 
             } else {
                 pressed2 = 0;                         //Button is not being pressed
             }
 
          }
+
+        //pot stuff
+        if(pot == 5){
+            if (!stable_pot){
+
+                //get original value, if possible here
+                ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
+                orig_val = ADC10MEM;
+
+                //update timer value
+                timers_used[0][5] = sample_time;
+                stable_pot = 1;
+
+            } else {
+                sample_pot = 1;        //start a sample
+            }
+
+            TA1CCR2 += sample_time;
+        }
+
 
         //thermometer stuff
         if(thermometer == 5){
@@ -2412,7 +2489,7 @@ __interrupt void Timer1_A1(void){
                 // oC = ((A10/1024)*1500mV)-986mV)*1/3.55mV = A10*423/1024 - 278, taken from example
                 orig_temp = ((temp - 673) * 423) / 1024;
                 //update timer value
-                timers_used[0][4] = sample_temp_time;
+                timers_used[0][5] = sample_temp_time;
 
             } else {
                 sample_temp = 1;        //start a sample
