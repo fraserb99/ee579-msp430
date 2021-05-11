@@ -60,6 +60,10 @@ unsigned int orig_val = 0;                      //Setting up value for original 
 unsigned int value = 0;                         //value on check
 signed int change = 0;                          //value to check how much the pot has changed
 const int step_size = 100;                       //value to indicate step size
+unsigned int stable_pot = 0;                    //used to check first value after stabilisation timers
+unsigned int sample_pot = 0;                    //used to denote if pot should be sampled
+const int sample_time = 328;                 //sample every 10ms
+int activated_pot[];                            //array used for timer activation and deactivation
 
 //temp stuff
 signed int thermometer = 0;                    //thermometer use
@@ -133,9 +137,8 @@ signed int led3_breath = 0;                    //LED3 blinking light
 #define BLUE (BIT5)
 #define YELLOW (BIT1 + BIT3)
 #define PURPLE (BIT1 + BIT5)
-#define CYAN (BIT3 + BIT5) //remove this
 #define WHITE (BIT1 + BIT3 + BIT5)
-const int colours[] = {RED, GREEN, BLUE, YELLOW, PURPLE, CYAN, WHITE};    //Array for the colours
+const int colours[] = {RED, GREEN, BLUE, YELLOW, PURPLE, WHITE};    //Array for the colours
 unsigned int colour = 0;                        //The colour selected
 unsigned int blink_rate_3 = 16384;              //rate for the blinking light for LED D3, or rotating, default 1Hz
 signed int light_flag_3 = 0;                    //breathing and fading light flag, brighter or darker,  brighter = 1, darker = -1;
@@ -183,23 +186,23 @@ int main(void)
 	WDTCTL = WDTPW | WDTHOLD;	// stop watchdog timer
 
 	//stuff for testing
-	//P1DIR |= BIT0 + BIT6;      // P1.0, P1.6 output
+	P1DIR |= BIT0 + BIT6;      // P1.0, P1.6 output
 	//P2DIR |= BIT1;             //utilise D3
-	button = 1;
-	button2 = 1;
+	//button = 1;
+	//button2 = 1;
 	//pot = 1;
 	//thermometer = 1;
 	//led1_blink = 1;
 	//blink_rate_3 = 32768;
 	//led3_on = 1;
-	//led3_blink = 1;
+	led3_blink = 1;
 	//led3_rot = 1;
-	//led3_dir = 1;
-	led1_breath = 1;
+	led3_dir = -1;
+	//led1_breath = 1;
 	//led2_breath = 1;
     //led3_breath = 1;
 	//led1_fade_in = 1;
-	//led3_fade_out = 1;
+	//led1_fade_out = 1;
 	//buzzer_beep = 1;
 
 	//UART stuff
@@ -398,7 +401,6 @@ int main(void)
 
         //pot
         //can only run timer or pot
-        //TODO: fix timer here
         if (pot > 0){
             if(t_activated) {
                 //send error message as both can't be active
@@ -409,51 +411,69 @@ int main(void)
                 pot = -1;
             } else {
                 if(!pot_activated){         //if not already activated
-                    ADC10CTL0 = ADC10ON + CONSEQ_0 + SREF_0;   // ADC10ON, single channel single sample, ref 0
+                    ADC10CTL0 = ADC10ON + CONSEQ_0 + SREF_0; // ADC10ON, single channel single sample, ref 0
                     ADC10CTL1 = INCH_4 + ADC10SSEL_1;          // input A4, clock = ACLK
                     ADC10AE0 |= BIT4;                          // PA.4 ADC option select
 
-                    //get original value
-                    ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
-                    orig_val = ADC10MEM;
-                    pot_activated = 1;
-                } else
-                //TODO: remove comments if the code can work with temp
-                //ADC10CTL0 |= SREF_0;                    //set ref to 0
-                //ADC10CTL1 |= INCH_4;                     //Ensure right channel
-                ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
-                //ADC10AE0 |= BIT4;                          // PA.4 ADC option select
-                //ADC10MEM = conversion result
-                //wait for result completion, triggers interrupt when done, ADC10Iflag
-                /*while ((ADC10CTL1 & ADC10BUSY) == 1) {//check if busy
-                    //Wait for sample to take place
-                }*/
-                value = ADC10MEM;           //Just to make sure the value doesn't change during checking
-                //reset ENC
-                ADC10CTL0 &= ~ENC;
-
-                if(value != orig_val){ //if value has changed
-                    //check by how much
-                    change = abs(orig_val - value);
-
-                    if (change >= step_size){
-                        //send message
+                    int counts[1] = {10}; //stabilisation count
+                    pot_activated = activate_free_timer(1, counts, 0); //single timer, doesn't need to be alone
+                    activated_pot[0] = activated_timers[0];      //record which ones were activated
+                    pot = activated_pot[0];              //Set for proper check in interrupts
+                    if (pot_activated != 1) { //if return is 1, has now been activated
+                        //something went wrong
                         send_message = 1;
-                        send[0][3] = 1; //set flag
-                        send[1][3] = value; //value of pot
-
-                        //change to new orig value
-                        orig_val = value;
-                        //testing light
-                        P1OUT ^= BIT6;
+                        send[0][0] = 1; //set flag
+                        send[1][0] = 1; //generic
+                        //disable pot
+                        pot = -1;
+                    } else {
+                        stable_pot = 0;
+                        sample_pot = 0;
                     }
+                } else {
+                    if(sample_pot) {
+                        //TODO: remove comments if the code can work with temp
+                        //ADC10CTL0 |= SREF_0;                    //set ref to 0
+                        //ADC10CTL1 |= INCH_4;                     //Ensure right channel
 
+                        ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
+                        //ADC10AE0 |= BIT4;                          // PA.4 ADC option select
+                        //ADC10MEM = conversion result
+                        //wait for result completion, triggers interrupt when done, ADC10Iflag
+                        while ((ADC10CTL1 & ADC10BUSY) == 1) {//check if busy
+                            //Wait for sample to take place
+                        }
+                        value = ADC10MEM;           //Just to make sure the value doesn't change during checking
+                        //reset ENC
+                        //ADC10CTL0 &= ~ENC;
+
+                        if(value != orig_val){ //if value has changed
+                            //check by how much
+                            change = abs(orig_val - value);
+
+                            if (change >= step_size){
+                                //send message
+                                send_message = 1;
+                                send[0][3] = 1; //set flag
+                                send[1][3] = value; //value of pot
+
+                                //change to new orig value
+                                orig_val = value;
+                                //testing light
+                                P1OUT ^= BIT6;
+                            }
+
+                        }
+                        sample_pot = 0;
+                    }
                 }
             }
 
             //Code here for the potentiometer, so basically send stuff at interval checks
         } else if(pot == -1){
+            deactivate_timer(activated_pot, 1);
             pot_activated = 0;
+            pot = 0;
         }
 
         //check if thermometer was requested
@@ -486,6 +506,8 @@ int main(void)
                         send[1][0] = 1; //generic
                         //disable temp
                         thermometer = -1;
+                    } else {
+                        stable = 0;
                     }
                 }
 
@@ -1115,7 +1137,9 @@ __interrupt void Timer0_A1(void){
 
                 //testing with light first
                 //P1OUT ^= BIT0;
-                led2_breath = 1;
+                //led2_breath = 1;
+                led1_fade_out = 1;
+                //buzzer_beep = -1;
                 held = 0;                               //button has now been released
                 //set timer count to 0
                 TA0CCR1 = 0;
@@ -1173,6 +1197,25 @@ __interrupt void Timer0_A1(void){
 
          }
 
+        //pot stuff
+        if(pot == 1){
+            if (!stable_pot){
+
+                //get original value, if possible here
+                ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
+                orig_val = ADC10MEM;
+
+                //update timer value
+                timers_used[0][1] = sample_time;
+                stable_pot = 1;
+
+            } else {
+                sample_pot = 1;        //start a sample
+            }
+
+            TA0CCR1 += sample_time;
+        }
+
 
         //thermometer stuff
         if(thermometer == 1){
@@ -1183,6 +1226,9 @@ __interrupt void Timer0_A1(void){
                 temp = ADC10MEM;
                 // oC = ((A10/1024)*1500mV)-986mV)*1/3.55mV = A10*423/1024 - 278, taken from example
                 orig_temp = ((temp - 673) * 423) / 1024;
+
+                //update timer value
+                timers_used[0][1] = sample_temp_time;
 
             } else {
                 sample_temp = 1;        //start a sample
@@ -1238,8 +1284,8 @@ __interrupt void Timer0_A1(void){
         if(led3_rot == 1){
             //verify boundaries
             if ((colour == 0) && (led3_dir == -1)){
-                colour = 6;
-            } else if ((colour == 6) && (led3_dir == 1)){
+                colour = 5;
+            } else if ((colour == 5) && (led3_dir == 1)){
                 colour = 0;
             } else {
                 colour = colour + led3_dir; //change colour based on direction
@@ -1256,8 +1302,8 @@ __interrupt void Timer0_A1(void){
                 TA0CCR1 += blink_rate_3;
             } else {
                 if ((colour == 0) && (led3_dir == -1)){
-                    colour = 6;
-                } else if ((colour == 6) && (led3_dir == 1)){
+                    colour = 5;
+                } else if ((colour == 5) && (led3_dir == 1)){
                     colour = 0;
                 } else {
                     colour = colour + led3_dir; //change colour based on direction
@@ -1415,6 +1461,9 @@ __interrupt void Timer0_A1(void){
                 // oC = ((A10/1024)*1500mV)-986mV)*1/3.55mV = A10*423/1024 - 278, taken from example
                 orig_temp = ((temp - 673) * 423) / 1024;
 
+                //update timer value
+                timers_used[0][2] = sample_temp_time;
+
             } else {
                 sample_temp = 1;        //start a sample
             }
@@ -1529,8 +1578,8 @@ __interrupt void Timer0_A1(void){
         if(led3_rot == 2){
             //verify boundaries
             if ((colour == 0) && (led3_dir == -1)){
-                colour = 6;
-            } else if ((colour == 6) && (led3_dir == 1)){
+                colour = 5;
+            } else if ((colour == 5) && (led3_dir == 1)){
                 colour = 0;
             } else {
                 colour = colour + led3_dir; //change colour based on direction
@@ -1548,8 +1597,8 @@ __interrupt void Timer0_A1(void){
                 //TA0CCR2 += blink_rate_3;
             } else {
                 if ((colour == 0) && (led3_dir == -1)){
-                    colour = 6;
-                } else if ((colour == 6) && (led3_dir == 1)){
+                    colour = 5;
+                } else if ((colour == 5) && (led3_dir == 1)){
                     colour = 0;
                 } else {
                     colour = colour + led3_dir; //change colour based on direction
@@ -1604,8 +1653,8 @@ __interrupt void Timer0_A1(void){
                 //change colour
                 //verify boundaries
                 if ((colour == 0) && (led3_dir == -1)){
-                    colour = 6;
-                } else if ((colour == 6) && (led3_dir == 1)){
+                    colour = 5;
+                } else if ((colour == 5) && (led3_dir == 1)){
                     colour = 0;
                 } else {
                     colour = colour + led3_dir; //change colour based on direction
@@ -1753,6 +1802,9 @@ __interrupt void Timer1_A0 (void)
             // oC = ((A10/1024)*1500mV)-986mV)*1/3.55mV = A10*423/1024 - 278, taken from example
             orig_temp = ((temp - 673) * 423) / 1024;
 
+            //update timer value
+            timers_used[0][3] = sample_temp_time;
+
         } else {
             sample_temp = 1;        //start a sample
         }
@@ -1807,8 +1859,8 @@ __interrupt void Timer1_A0 (void)
     if(led3_rot == 3){
         //verify boundaries
         if ((colour == 0) && (led3_dir == -1)){
-            colour = 6;
-        } else if ((colour == 6) && (led3_dir == 1)){
+            colour = 5;
+        } else if ((colour == 5) && (led3_dir == 1)){
             colour = 0;
         } else {
             colour = colour + led3_dir; //change colour based on direction
@@ -1825,8 +1877,8 @@ __interrupt void Timer1_A0 (void)
             TA1CCR0 += blink_rate_3;
         } else {
             if ((colour == 0) && (led3_dir == -1)){
-                colour = 6;
-            } else if ((colour == 6) && (led3_dir == 1)){
+                colour = 5;
+            } else if ((colour == 5) && (led3_dir == 1)){
                 colour = 0;
             } else {
                 colour = colour + led3_dir; //change colour based on direction
@@ -1976,6 +2028,26 @@ __interrupt void Timer1_A1(void){
 
          }
 
+        //thermometer stuff
+        if(thermometer == 4){
+            if (!stable){
+                stable = 1;
+                //get original value, if possible here
+                ADC10CTL0 |= ENC + ADC10SC;             // Sampling and conversion start
+                temp = ADC10MEM;
+                // oC = ((A10/1024)*1500mV)-986mV)*1/3.55mV = A10*423/1024 - 278, taken from example
+                orig_temp = ((temp - 673) * 423) / 1024;
+
+                //update timer value
+                timers_used[0][4] = sample_temp_time;
+
+            } else {
+                sample_temp = 1;        //start a sample
+            }
+
+            TA1CCR1 += sample_temp_time;
+        }
+
         //outputs
         //LED1 blinking
         if(led1_blink == 4){
@@ -2113,8 +2185,8 @@ __interrupt void Timer1_A1(void){
         if(led3_rot == 4){
             //verify boundaries
             if ((colour == 0) && (led3_dir == -1)){
-                colour = 6;
-            } else if ((colour == 6) && (led3_dir == 1)){
+                colour = 5;
+            } else if ((colour == 5) && (led3_dir == 1)){
                 colour = 0;
             } else {
                 colour = colour + led3_dir; //change colour based on direction
@@ -2131,8 +2203,8 @@ __interrupt void Timer1_A1(void){
                 TA1CCR1 += blink_rate_3;
             } else {
                 if ((colour == 0) && (led3_dir == -1)){
-                    colour = 6;
-                } else if ((colour == 6) && (led3_dir == 1)){
+                    colour = 5;
+                } else if ((colour == 5) && (led3_dir == 1)){
                     colour = 0;
                 } else {
                     colour = colour + led3_dir; //change colour based on direction
@@ -2202,8 +2274,8 @@ __interrupt void Timer1_A1(void){
                 //change colour
                 //verify boundaries
                 if ((colour == 0) && (led3_dir == -1)){
-                    colour = 6;
-                } else if ((colour == 6) && (led3_dir == 1)){
+                    colour = 5;
+                } else if ((colour == 5) && (led3_dir == 1)){
                     colour = 0;
                 } else {
                     colour = colour + led3_dir; //change colour based on direction
@@ -2339,6 +2411,8 @@ __interrupt void Timer1_A1(void){
                 temp = ADC10MEM;
                 // oC = ((A10/1024)*1500mV)-986mV)*1/3.55mV = A10*423/1024 - 278, taken from example
                 orig_temp = ((temp - 673) * 423) / 1024;
+                //update timer value
+                timers_used[0][4] = sample_temp_time;
 
             } else {
                 sample_temp = 1;        //start a sample
@@ -2453,8 +2527,8 @@ __interrupt void Timer1_A1(void){
         if(led3_rot == 5){
             //verify boundaries
             if ((colour == 0) && (led3_dir == -1)){
-                colour = 6;
-            } else if ((colour == 6) && (led3_dir == 1)){
+                colour = 5;
+            } else if ((colour == 5) && (led3_dir == 1)){
                 colour = 0;
             } else {
                 colour = colour + led3_dir; //change colour based on direction
@@ -2471,8 +2545,8 @@ __interrupt void Timer1_A1(void){
                 TA1CCR2 += blink_rate_3;
             } else {
                 if ((colour == 0) && (led3_dir == -1)){
-                    colour = 6;
-                } else if ((colour == 6) && (led3_dir == 1)){
+                    colour = 5;
+                } else if ((colour == 5) && (led3_dir == 1)){
                     colour = 0;
                 } else {
                     colour = colour + led3_dir; //change colour based on direction
@@ -2526,8 +2600,8 @@ __interrupt void Timer1_A1(void){
                 //change colour
                 //verify boundaries
                 if ((colour == 0) && (led3_dir == -1)){
-                    colour = 6;
-                } else if ((colour == 6) && (led3_dir == 1)){
+                    colour = 5;
+                } else if ((colour == 5) && (led3_dir == 1)){
                     colour = 0;
                 } else {
                     colour = colour + led3_dir; //change colour based on direction
@@ -2944,7 +3018,7 @@ int activate_free_timer(int registers, int counts[], int alone){
     return 1;
 
 }
-//TODO: Fix this
+
 //function to turn off the timers activated - or set the count value to 0, check if each value is now zero so the full timer should be turned off
 void deactivate_timer(int activated[], int len){
     unsigned int i;
