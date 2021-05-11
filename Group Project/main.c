@@ -190,14 +190,14 @@ int main(void)
 	//P2DIR |= BIT1;             //utilise D3
 	//button = 1;
 	//button2 = 1;
-	//pot = 1;
+	pot = 1;
 	//thermometer = 1;
 	//led1_blink = 1;
 	//blink_rate_3 = 32768;
 	//led3_on = 1;
-	led3_blink = 1;
+	//led3_blink = 1;
 	//led3_rot = 1;
-	led3_dir = -1;
+	//led3_dir = -1;
 	//led1_breath = 1;
 	//led2_breath = 1;
     //led3_breath = 1;
