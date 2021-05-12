@@ -13,7 +13,11 @@ unsigned int writeToDo = 1;         // Set to 1 when write is needed: normally 0
 unsigned int doneFlag = 1;          // Mark when a msg section is parsed
 unsigned int offset = 0;            // Changes output pointer value
 
-//const char *inputValueStr = "{InputType:"
+// SOme stupid constant strings I gotta send
+const char *inputTypeStr = "{\"InputType\":\"";
+const char *inputValueStr = "\"\n\"Value:\"";
+const char *endStr = "\"\n}\n";
+
 // Test strings
 char *type = "Button1";
 char *value = "200";
@@ -66,7 +70,7 @@ int main(void){
 
 
 // Write JSON message characters to TX buffer
-
+// JSON message comes out in format: {"InputType":"<type>\n "Value":<value>}
 #pragma vector=USCIAB0TX_VECTOR
 __interrupt void USCI0TX_ISR(void){
 
@@ -110,7 +114,7 @@ void UARTWrite(void){
 
 void write1(void){
 
-    outMsg = "{\"";
+    outMsg = inputTypeStr;
 
     IE2 |= UCA0TXIE;                        // Enable TX interrupt
     UCA0TXBUF = *outMsg;      // Write first output character to buffer
@@ -130,7 +134,7 @@ void write2(void){
 
 void write3(void){
 
-    outMsg = "\":\"";
+    outMsg = inputValueStr;
 
     IE2 |= UCA0TXIE;                        // Enable TX interrupt
     UCA0TXBUF = *outMsg;      // Write first output character to buffer
@@ -150,7 +154,7 @@ void write4(void){
 
 void write5(void){
 
-    outMsg = "\"}\n";
+    outMsg = endStr;
 
     IE2 |= UCA0TXIE;                        // Enable TX interrupt
     UCA0TXBUF = *outMsg;      // Write first output character to buffer
