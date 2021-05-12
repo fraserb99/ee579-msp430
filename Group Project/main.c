@@ -249,16 +249,16 @@ int main(void)
 	 */
 
 	//Inputs
-	//button = 1;           //Button 1
-	//button2 = 1;          //Button 2
-	//pot = 1;              //Potentiometer
-	//thermometer = 1;      //Thermometer
+	button = 1;           //Button 1
+	button2 = 1;          //Button 2
+	pot = 1;              //Potentiometer
+	thermometer = 1;      //Thermometer
 
 	//Outputs, these can be activated here or copied over to the timer interrupts to be activat3ed by input events
 	//led1_on = 1;          //LED D1 (green) on, to turn off assign value -1
 	//led1_blink = 1;       //LED D1 blink at default rate, this rate can be altered by altering the blink_rate_1 variable
 	//led1_fade_in = 1;     //LED D1 fade in at default rate, this can be specified by assigning one of the blink_rate variables to period_1
-	//led1_fade_out = 1'     //LED D1 fade out at default rate, can be specified in the same manner as fade in
+	//led1_fade_out = 1;     //LED D1 fade out at default rate, can be specified in the same manner as fade in
 	//led1_breath = 1;      //LED D1 breathing light, at default rate, can be specified in the same manner as fade
 
 	//led2_on = 1;          //LED D2 (red) on, to turn off assign value -1
@@ -276,7 +276,7 @@ int main(void)
 	//led3_dir = 1          //Used to set rotation direction for LED 3,
 
 	//buzzer_tone = 1;      //Buzzer on for a specific duration, currently default duration, this can be specified by setting the buzzer_duration variable
-	//buzzer_beep = 1;      //Buzzer beeping until stopped (highly recommended to use this in conjunction with an input to stop it as buzzer_beep needs to be set to -1 to deactivate
+	buzzer_beep = 1;      //Buzzer beeping until stopped (highly recommended to use this in conjunction with an input to stop it as buzzer_beep needs to be set to -1 to deactivate
 	                        //On duration and off duration of the beeps is set separately, currently default, can be changed by setting buzzer_duration, and buzzer_duration_off
 
 
@@ -1312,7 +1312,7 @@ __interrupt void Timer0_A1(void){
 
                 //wanted output for testing should be set here, some were used during initial testing, uncomment for use
                 //led2_breath = 1;
-                //led2_fade_out = 1;
+                led2_fade_out = 1;
                 //buzzer_beep = -1;
                 held = 0;                               //button has now been released
                 //set timer count to 0
@@ -1349,7 +1349,7 @@ __interrupt void Timer0_A1(void){
                 send[1][1] = timer_count2; //the time held
 
                 //testing outputs should be activated here
-                //buzzer_beep = -1;
+                buzzer_beep = -1;
 
                 held2 = 0;                               //button has now been released
 
@@ -1633,7 +1633,7 @@ __interrupt void Timer0_A1(void){
 
                 //testing values for second button
                 //led3_breath = 1;
-                //buzzer_beep = -1;
+                buzzer_beep = -1;
                 held2 = 0;                               //button has now been released
                 TA0CCR2 = 0;
             }
@@ -3086,7 +3086,7 @@ int activate_free_timer(int registers, int counts[], int alone){
     if(registers == 1) {
         //loop through and look first for registers with the same counts, unless the timer should be alone
         if(alone) {
-            for(i=0; i<5; i++){
+            for(i=0; i<6; i++){
                 if(timers_used[0][i] == 0){
                    to_activate[0] = i;
                    index = 1; //found one
@@ -3100,7 +3100,7 @@ int activate_free_timer(int registers, int counts[], int alone){
                 return 0;
             } //else its fine, just continue
         } else { //can look for evidence of same register value, if free
-            for(i=0; i<5; i++){
+            for(i=0; i<6; i++){
                 //check that the timer is available for others
                if((timers_used[0][i] == counts[0]) && (timers_used[1][i] != -1)){
                   to_activate[0] = i;
@@ -3110,7 +3110,7 @@ int activate_free_timer(int registers, int counts[], int alone){
             }
             //if none was found, check for free ones
             if(index == 0) {
-                for(i=0; i<5; i++){
+                for(i=0; i<6; i++){
                     //check for first free timer
                    if(timers_used[0][i] == 0){
                       to_activate[0] = i;
