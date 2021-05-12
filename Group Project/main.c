@@ -258,7 +258,7 @@ int main(void)
 	//led1_on = 1;          //LED D1 (green) on, to turn off assign value -1
 	//led1_blink = 1;       //LED D1 blink at default rate, this rate can be altered by altering the blink_rate_1 variable
 	//led1_fade_in = 1;     //LED D1 fade in at default rate, this can be specified by assigning one of the blink_rate variables to period_1
-	//led1_fad_out = 1'     //LED D1 fade out at default rate, can be specified in the same manner as fade in
+	//led1_fade_out = 1'     //LED D1 fade out at default rate, can be specified in the same manner as fade in
 	//led1_breath = 1;      //LED D1 breathing light, at default rate, can be specified in the same manner as fade
 
 	//led2_on = 1;          //LED D2 (red) on, to turn off assign value -1
