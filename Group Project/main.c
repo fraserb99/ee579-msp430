@@ -220,7 +220,7 @@ int main(void)
 	 * Un-comment the features wanted, then select debug and run. Ensure all external devices are
 	 * connected as per the diagram in the design specifications as these will not function otherwise.
 	 *
-	 * for features connected to inputs the required affecting output needs to be specified
+	 * For features connected to inputs the required affecting output needs to be specified
 	 * in the timer code for each corresponding input, these can be found in the timer interrupts later
 	 * in this file. It is not necessary to specify the wanted output for each timer interrupt,
 	 * these are dynamically allocated base on available timers and will therefore allocate the
@@ -239,9 +239,12 @@ int main(void)
 	 * Those with 2: LED fade in, LED Fade out, LED breathing
 	 *
 	 * Please note that Buzzer Tone, Fade in, and Fade out will deactivate their timer upon task completion.
+	 * Fade In will still remain on after this activation.
 	 * Default durations are set in the variable declaration above, the duration is specified in the comments.
 	 *
-	 * To deactivate any input or output simply assign them a value of -1
+	 * To deactivate any input or output simply assign them a value of -1. For Fading In, as specified,
+	 * the light will remain active and this can be turned off in 2 different ways: Set fade out to 1,
+	 * set led on to -1.
 	 *
 	 */
 
@@ -293,6 +296,11 @@ int main(void)
     }
 
 
+    //Set unused pins to output direction, P1.7
+    P1DIR |= BIT7;
+    //P2.0, 2.6 and 2.7
+    P2DIR |= BIT0 + BIT6 + BIT7;
+
 
 	__bis_SR_register(GIE);                     //interrupt enabled
 
@@ -303,7 +311,7 @@ int main(void)
 
         //sending messages, based on set flags
         if(send_message){ //there is a message to send
-            int i, to_send, value;
+            unsigned int i, to_send, value;
             for(i=0; i<5; i++){ //loop through and check for flag
 
                 if(send[0][i] == 1){ //if the flag is set
@@ -3483,7 +3491,7 @@ int get_timer_code(int timers[]){
  */
 void check_breath(int on){
     //check if more than 1 breathing light is currently active
-    int i;
+    unsigned int i;
     int active = 0;
     for(i=0; i<3; i++){
         if(lights_used[i] != 0){
