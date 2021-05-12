@@ -1,174 +1,160 @@
-#include <msp430.h> 
-#include "../jsmn.h"
-#include <stdio.h>
+#include <msp430.h>
 #include <string.h>
 
-/* Separate file for basic premise of UART reading
- * Handles parsing the RX line, translating JSON into commands and parameters, comparison against known commands and switch statement for activating different I/O
- * Handles creating JSON packets of input values, sending them on the TX line
+
+/**
+ * testing output of json building
  *
  */
 
-// Global declarations
-unsigned char unparsedMsg[];        // Stores incoming message
-unsigned int msgIndex = 0;          // Increments characters in message string
-unsigned int msgComplete = 0;       // Flag for when a full input message is received
-unsigned char outMsg[];             // Holds JSON structured message to write to TX
+// Globals
+char *outMsg = "Big placeholder string because.";              // Maximum expected message length is 32 chars
+unsigned int writeToDo = 1;         // Set to 1 when write is needed: normally 0
+unsigned int doneFlag = 1;          // Mark when a msg section is parsed
+unsigned int offset = 0;            // Changes output pointer value
 
-void UARTWrite(unsigned int writeMessage);
-void UARTRead(void);
+//const char *inputValueStr = "{InputType:"
+// Test strings
+char *type = "Button1";
+char *value = "200";
 
-int main(void) {
+void UARTWrite(void);
 
-    // Safety checks first
-    WDTCTL = WDTPW + WDTHOLD;                 // Stop WDT
-    if (CALBC1_1MHZ==0xFF)                    // If calibration constant erased
-    {
-        while(1);                             // Do not load, trap CPU!!
-    }
-
-    // UART setup
-    DCOCTL = 0;                               // Select lowest DCOx and MODx settings
-    BCSCTL1 = CALBC1_1MHZ;                    // Set DCO
-    DCOCTL = CALDCO_1MHZ;
-    P1SEL = BIT1 + BIT2;                      // P1.1 = RXD, P1.2 = TXD
-    P1SEL2 = BIT1 + BIT2;
-    UCA0CTL1 |= UCSSEL_2;                     // SMCLK
-    UCA0BR0 = 8;                              // 1MHz 115200
-    UCA0BR1 = 0;                              // 1MHz 115200
-    UCA0MCTL = UCBRS2 + UCBRS0;               // Modulation UCBRSx = 5
-    UCA0CTL1 &= ~UCSWRST;                     // Initialise USCI state machine
-    IE2 |= UCA0RXIE;                          // Enable USCI A0 RX interrupt
-
-    while(1){
-
-        if (msgComplete == 1){
-            UARTRead();
-
-        }
-    }
-
-}
-
-// Read characters from RX buffer, save as string, parse for JSON object
-#pragma vector=USCIAB0RX_VECTOR
-__interrupt void USCI0RX_ISR(void) {
+void write1(void);
+void write2(void);
+void write3(void);
+void write4(void);
+void write5(void);
 
 
-    unparsedMsg[msgIndex] = UCA0RXBUF;          // Store character from RX buffer
+int main(void){
+
+      WDTCTL = WDTPW + WDTHOLD;                 // Stop WDT
 
 
-    if (unparsedMsg[msgIndex] == "}"){          // Check for message delimiter, if end of message set flag and reset index
-        msgIndex = 0;
-        msgComplete = 1;
-    }
-    else {
-        msgIndex++;
-    }
+
+      if (CALBC1_1MHZ == 0xFF){  // If calibration constant erased
+              while (1); // do not load, trap CPU!!
+      }
+
+      DCOCTL = 0;            // Select lowest DCOx and MODx settings
+      BCSCTL1 = CALBC1_1MHZ; // Set DCO
+      DCOCTL = CALDCO_1MHZ;
+      P1SEL = BIT1 + BIT2;  // P1.1 = RXD, P1.2=TXD
+      P1SEL2 = BIT1 + BIT2; // P1.1 = RXD, P1.2=TXD
+      UCA0CTL1 |= UCSSEL_2; // SMCLK
+      UCA0BR0 = 104;        // 1MHz 9600
+      UCA0BR1 = 0;          // 1MHz 9600
+      UCA0MCTL = UCBRS0;    // Modulation UCBRSx = 1
+      UCA0CTL1 &= ~UCSWRST; // Initialize USCI state machine
+      //IE2 |= UCA0RXIE;      // Enable USCI_A0 RX interrupt
+      IE2 |= UCA0TXIE;
+
+      while (1){
+          if (doneFlag == 1){
+              doneFlag = 0;
+              UARTWrite();
+          }
+          else {
+              __bis_SR_register(LPM0_bits + GIE);   //put in low power mode LPM0 + GIE
+          }
+      }
+
 
 }
+
+
 
 // Write JSON message characters to TX buffer
-#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
+
 #pragma vector=USCIAB0TX_VECTOR
 __interrupt void USCI0TX_ISR(void){
 
-    UCA0TXBUF = outMsg[i++];                 // Read next char of message into TX buffer
+    UCA0TXBUF = *(outMsg + offset);
+    offset++;                 // Read next char of message into TX buffer
 
-    if (i == sizeof outMsg-1){               // If end of message, disable TX interrupt
+    if (*(outMsg + offset-1) == '\0'){                  // If end of message, disable TX interrupt
         IE2 &= ~UCA0TXIE;
+        writeToDo++;                            // Write next part of output
+        writeToDo = writeToDo%6;
+        doneFlag = 1;
+        offset = 0;
+        // break away from low power mode
+        __bic_SR_register_on_exit(LPM0_bits);
     }
 }
 
 
+void UARTWrite(void){
 
-void UARTWrite(unsigned int writeMessage){
+    switch (writeToDo){
+        case 1:
+            write1();
+            break;
+        case 2:
+            write2();
+            break;
+        case 3:
+            write3();
+            break;
+        case 4:
+            write4();
+            break;
+        case 5:
+            write5();
+            break;
+    }
 
-    // Convert to JSON message, ? as delimiter
-    outMsg = "{\"array[0][writeMessage]\":\"" + array[1][writeMessage] + "\"}";
+}
+
+
+void write1(void){
+
+    outMsg = "{\"";
 
     IE2 |= UCA0TXIE;                        // Enable TX interrupt
+    UCA0TXBUF = *outMsg;      // Write first output character to buffer
+    offset++;
 
 }
 
-/* Parses RX buffer from a JSON string to a struct using the JSMN library and activates
- * the relevant input and output flags
- *
- */
-void UARTRead(void){
+void write2(void){
 
-    // JSMN library use
-    jsmn_parser parser;             // Create a parser instance
-    size_t tokenCount = 8;          // Number of potential tokens (should be maximum 5, for DeviceConfig message)
-    jsmntok_t tokens[tokenCount];   // Initialise tokens for parser output
-    int result;                     // Number of tokens actually used
+    outMsg = type;
 
-    jsmn_init(&parser);             // Initialise parser
-    result = jsmn_parse(&parser, unparsedMsg, strlen(unparsedMsg), tokens, tokenCount);
+    IE2 |= UCA0TXIE;                        // Enable TX interrupt
+    UCA0TXBUF = *outMsg;      // Write first output character to buffer
+    offset++;
 
-    if (result < 0){
-        // Failed
-    }
+}
 
-    // Extract strings from jsmn struct
-    unsigned char type[] = tokens[0];
+void write3(void){
 
-    // Find which outputType the message is
-    if (strcmp(type, "LedOutput")){
-        // Check LED
-        // Get state (bool)
-        // Get colour (enum)
-        // Activate LED
-    }
+    outMsg = "\":\"";
 
-    else if (strcmp(type, "LedBreathe")){
-        // Check LED
-        // Get period (int)
-        // Get colour (enum)
-        // Activate breathe
-    }
+    IE2 |= UCA0TXIE;                        // Enable TX interrupt
+    UCA0TXBUF = *outMsg;      // Write first output character to buffer
+    offset++;
 
-    else if (strcmp(type, "LedBlink")){
-        // Check LED
-        // Get period (int)
-        // Get colour (enum)
-        // Activate blink
-    }
+}
 
-    else if (strcmp(type, "LedFade")){
-        // Check LED
-        // Get state (bool)
-        // Get duration (int)
-        // Get colour (enum)
-        // Activate fade
-    }
+void write4(void){
 
-    else if (strcmp(type, "LedCycle")){
-        // Check LED
-        // Get period (int)
-        // Get colour (enum)
-        // Activate blink
-    }
+    outMsg = value;
 
-    else if (strcmp(type, "BuzzerOn")){
-        // Get duration (int)
-        // Activate buzz
-    }
+    IE2 |= UCA0TXIE;                        // Enable TX interrupt
+    UCA0TXBUF = *outMsg;      // Write first output character to buffer
+    offset++;
 
-    else if (strcmp(type, "BuzzerBeep")){
-        // Get on duration (int)
-        // Get off duration (int)
-        // Activate beep
-    }
+}
 
-    else if (strcmp(type, "DeviceConfig")){
-        // Get ButtonPushed (bool)
-        // Get Switch (bool)
-        // Get Potentiometer (bool)
-        // Get Temperature (bool)
-    }
+void write5(void){
 
-    msgComplete = 0;            // Mark as done
+    outMsg = "\"}\n";
+
+    IE2 |= UCA0TXIE;                        // Enable TX interrupt
+    UCA0TXBUF = *outMsg;      // Write first output character to buffer
+    offset++;
 
 }
 
