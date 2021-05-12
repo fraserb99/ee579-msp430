@@ -3000,6 +3000,37 @@ __interrupt void Port_1(void){
  */
 
 /**
+ * Activation of features, reads and parses messages
+ * TODO: Input the actual function for this here
+ */
+
+    //so need to change the values of the wanted outputs
+    //only listing those that needs changing
+
+    //if LED blink:
+        //change period of led:
+        //blink_rate_x = (32768*value)/4000;
+    //if LED breath, or fade:
+        //need to round period to closest frequency can have 1Hz, 2HZ or 4Hz = 1s, 0.5s, 0.25ms
+        //actually that is a value of 2000ms, 1000ms or 500ms
+        //so any value given needs to be close to either, suggestion is:
+        //if value > 1500 set to 1Hz, if 1500 > value > 750 set to 2Hz, if value < 750 set to 4hz
+        //so period_x = brightness_register_y, where x is the led and y is 1 - 1Hz, 2 - 2Hz, or 3 - 4Hz for the settings
+    //if LED3 rot:
+        //period is set to that of the value so
+        //blink_rate_3 = (32768*value)/2000;
+    //for buzzer there is no need for calculations
+    //if buzzer on:
+        //buzzer_duration = value (in ms)
+    //if buzzer beep: (all in ms)
+        //buzzer_duration = value_on
+        //buzzer_duration_off = value_off
+
+    //to set the colour of the third LED the colour variable needs to be set to a number between 0 and 5
+    //the array looks like {RED, GREEN, BLUE, YELLOW, PURPLE, WHITE} where colour reflect index
+    //so colour = 2 is blue
+
+/**
  * function for activating a specific timer, takes in the wanted timer to activate and the CCR value to use
  * returns 1 if successful. else 0
  */
