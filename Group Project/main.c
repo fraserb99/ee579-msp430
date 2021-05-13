@@ -569,13 +569,12 @@ int main(void)
 
                             //change to new orig value
                             orig_val = value;
-                            //testing light, need to be activated by setting
-                            /*P1DIR |= BIT0;
+                            //testing light, uncomment for use
                             //simple case to test over and under 500
-                            if(value > 500) {
-                                P1OUT |= BIT0; //turn on LED 1
+                            /*if(value > 500) {
+                                led1_on = 1; //turn on LED 1
                             } else {
-                                P1OUT &= ~BIT0; //turn off LED 1
+                                led1_on = -1; //turn off LED 1
                             }*/
 
                         }
@@ -664,13 +663,12 @@ int main(void)
                         send[1][4] = value_temp; //temp value
                         //change to new orig value
                         orig_temp = value_temp;
-                        //testing light, need to be activated by setting
-                        /*P1DIR |= BIT6;
+                        //testing light, uncomment for use
                         //simple case to test over and under 18C
-                        if(value_temp >= 18) {
-                            P1OUT |= BIT6; //turn on LED 1
+                        /*if(value_temp >= 18) {
+                            led2_on = 1; //turn on LED 1
                         } else {
-                            P1OUT &= ~BIT6; //turn off LED 1
+                            led2_on = -1; //turn off LED 1
                         }
                          */
                     }
