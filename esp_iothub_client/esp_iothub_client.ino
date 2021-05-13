@@ -1,4 +1,5 @@
 
+
 #include <AzureIoTHub.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,7 +8,7 @@
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
 
-#include "iot_configs.h" 
+#include "iot_configs.h"
 #include "sample_init.h"
 #include "cJSON.h"
 #include "Esp.h"
@@ -16,8 +17,8 @@
 #include "iothubtransportmqtt.h"
 
 //Update these with your own wifi ssid and password
-static const char ssid[] = "VM3157614" ;
-static const char pass[] = "hh8Kbdvkj6hj";
+static const char ssid[] = IOT_CONFIG_WIFI_SSID;
+static const char pass[] = IOT_CONFIG_WIFI_PASSWORD ;
 
 /* Define several constants/global variables */
 //static const char* connectionString = DEVICE_CONNECTION_STRING;
@@ -73,8 +74,6 @@ static IOTHUBMESSAGE_DISPOSITION_RESULT receive_message_callback(IOTHUB_MESSAGE_
 
 
   }
-
-  /* Some device specific action code goes here... */
   (*counter)++;
   return IOTHUBMESSAGE_ACCEPTED;
 }
@@ -137,14 +136,15 @@ static void run_demo()
     // We can use the code below to send messages when there's serial input from the uC
     if (Serial.available() > 0) {
       char incomingBuffer[500];
-      int rlen = Serial.readBytesUntil('\n', incomingBuffer, 500);
+      int rlen = Serial.readBytesUntil('\0', incomingBuffer, 500);
       byte msgText[rlen];
       // prints the received data
-      //Serial.print("I received: ");
+      Serial.print("I received: ");
       for (int i = 0; i < rlen; i++) {
         Serial.print(incomingBuffer[i]);
         msgText[i] = incomingBuffer[i];
       }
+
       cJSON *parsed = cJSON_Parse(incomingBuffer);
       if (parsed == NULL)
       {
@@ -153,34 +153,14 @@ static void run_demo()
       else {
         message_handle = IoTHubMessage_CreateFromByteArray(msgText, rlen);
         IOTHUB_CLIENT_RESULT result = IoTHubDeviceClient_LL_SendEventAsync(device_ll_handle, message_handle, send_confirm_callback, NULL);
-        Serial.print("result: ");
-        Serial.println(result);
+
         //The message is copied to the sdk so the we can destroy it
         IoTHubMessage_Destroy(message_handle);
       }
     }
 
-
-    // Construct the iothub message from a string or a byte array
-    //message_handle = IoTHubMessage_CreateFromString(telemetry_msg);
-    // message_handle = IoTHubMessage_CreateFromByteArray((const unsigned char*)msgText, strlen(msgText)));
-
-    // Set Message property
-    /*(void)IoTHubMessage_SetMessageId(message_handle, "MSG_ID");
-      (void)IoTHubMessage_SetCorrelationId(message_handle, "CORE_ID");
-      (void)IoTHubMessage_SetContentTypeSystemProperty(message_handle, "application%2fjson");
-      (void)IoTHubMessage_SetContentEncodingSystemProperty(message_handle, "utf-8");*/
-
-    // Add custom properties to message
-    // (void)IoTHubMessage_SetProperty(message_handle, "property_key", "property_value");
-
-    // result = IoTHubDeviceClient_LL_SendEventAsync(device_ll_handle, message_handle, send_confirm_callback, NULL);
-    // The message is copied to the sdk so the we can destroy it
-    // IoTHubMessage_Destroy(message_handle);
-
     IoTHubDeviceClient_LL_DoWork(device_ll_handle);
     ThreadAPI_Sleep(3);
-    // reset_esp_helper();
 
   } while (true);
 
@@ -194,7 +174,7 @@ static void run_demo()
 //code that runs once when the esp receives power
 void setup() {
   //baudrate of 115200
-  Serial.begin(115200);
+
   // Select the Protocol to use with the connection
   IOTHUB_CLIENT_TRANSPORT_PROVIDER protocol = MQTT_Protocol;
 
@@ -206,10 +186,11 @@ void setup() {
     Serial.print(".");
   }
   Serial.println("Connected");
-
-  //Need this line to setup the sample
+  //run with blank strings to initialise
   sample_init("", "");
-
+  //flush the serial and reconfigure baud rate to 9600
+  Serial.flush();
+  Serial.begin(9600);
   //send a http post request with the device details to register the device with the system
   const char* connectionString;
   String post_data = "{\"deviceId\":\"" + WiFi.macAddress() + "\"}";
@@ -274,7 +255,7 @@ void setup() {
 
     // Setting connection status callback to get indication of connection to iothub
     (void)IoTHubDeviceClient_LL_SetConnectionStatusCallback(device_ll_handle, connection_status_callback, NULL);
-
+    Serial.println("READY TO PARSE");
   }
 }
 //loop whilst there is stuff to do
