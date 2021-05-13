@@ -4,13 +4,11 @@
 /**
  * main.c for Group 4
  *
- * Main file for the EE579 Advanced Microcontroller Applications
- * Created by Group 4.
- *
- * Code in here is based on previous challenges and examples from TI code
+ * Main file for the EE579 Advanced Microcontroller Applications Group Project
+ * Microcontroller I/O feature functionality. Created by members of Group 4.
  *
  * Includes all functionality for Inputs and Outputs specified in the design
- * document (2 buttons, 1 potentiometer, 1 thermometer, 3 lights, and 1 buzzer
+ * document (2 buttons, 1 potentiometer, 1 thermometer, 3 lights, and 1 buzzer)
  *
  * Timers are allocated dynamically based on activation of function (input/output)
  * For any initialisation in the same occurrence of a while loop the functionalities
@@ -18,22 +16,25 @@
  * Button 1, Button 2, Potentiometer, Thermometer, LED 1, LED 2, LED 3, Buzzer and
  * their related configurations.
  * The exact order of these can be found in the while loop in the main function.
+ *
+ * Code in here is based on previous challenges and examples from TI code.
  */
 
 /**
- * Setup of global variables and constants, specified based on functionality
+ * Setup of global variables and constants, specified based on functionality and
+ * grouped by I/O
  */
 
 /**
-* sending messages
-* first row is flag, second is value to send, codes for index:
-* 0 = error, 1 = button, 2 = button2, 3 = potentiometer, 4 = temperature
+* Sending messages
+* First row is flag, second is value to send, codes for index:
+* 0 = error, 1 = button, 2 = button2, 3 = potentiometer, 4 = temperature.
 *
-* for error if value is 1 - generic, if value is 2 - no more timers, 3 - clashing rules
+* For error if value is 1 - generic, if value is 2 - no more timers, 3 - clashing rules
 */
 int send[2][5] = {{0, 0, 0, 0, 0},
                   {0, 0, 0, 0, 0}};
-unsigned int send_message = 0;                  //flag used to indicate that at least one message needs to be sent
+unsigned int send_message = 0;                  //Flag used to indicate that at least one message needs to be sent
 
 /**
  * Description of codes used for the timers, A0_0 is reserved for UART
@@ -48,7 +49,8 @@ unsigned int send_message = 0;                  //flag used to indicate that at 
  */
 
 /**
- * inputs
+ * Inputs
+ *
  * The codes for activation are based on the timers, if value is 0 that means not active, if -1 means disable/deactivate
  * for the outputs this usually means turning off what ever function was used (light. buzzer) the only exception is the
  * fading in lights which only disable timers and resets the variable, the light will still stay on and this needs to be manually turned off
@@ -100,9 +102,10 @@ unsigned int sample_temp = 0;                   //boolean to be used to indicate
 const int sample_temp_time = 16384;             //used for sample time of the temperature, every second (1Hz)
 int activated_temp[];                           //indicator for activated timer for the temperature
 
+
 /**
  * Outputs
- * variables and constants for breathing and fading lights, same for all LEDs independent of user defined speeds
+ * variables and constants for breathing and fading lights, same for all LEDs
  */
 signed int max_brightness = 32;                 //used for checking max value for brightness and counter value, based on single light
 signed int change_period = 16;                  //period for flashing and breathing, default values, based on single light
@@ -184,7 +187,7 @@ const int buzzer_period = 82;                   //timer for counting the require
 int activated_buzzer[];                         //Array for activated timer for the buzzer
 
 /**
- * array for timer usage, 0 if not used, 1 if used 0, second row is to indicate how many functions are using the timers
+ * Array for timer usage, 0 if not used, 1 if used 0, second row is to indicate how many functions are using the timers
  * buttons needs their own and are therefore -1 if they are using the timer ie second row value is -1
  * position as timer codes, UART holds A0_0, it is included here to verify UART timing, and to assist in timer denotions as specified previously
  */
@@ -571,7 +574,7 @@ int main(void)
                             orig_val = value;
                             //testing light, uncomment for use
                             //simple case to test over and under 500
-                            /*if(value > 500) {
+                           /* if(value > 500) {
                                 led1_on = 1; //turn on LED 1
                             } else {
                                 led1_on = -1; //turn off LED 1
@@ -669,8 +672,7 @@ int main(void)
                             led2_on = 1; //turn on LED 1
                         } else {
                             led2_on = -1; //turn off LED 1
-                        }
-                         */
+                        }*/
                     }
                 }
 
@@ -686,7 +688,7 @@ int main(void)
 
 
         /**
-         * Outputs activation
+         * Output activations
          */
 
         /**
@@ -938,7 +940,6 @@ int main(void)
 
         } else if (led2_fade_in == -1){
             //led2_active = 0; - light is still active
-            //P1OUT &= ~BIT6;
             deactivate_timer(activated_led2, 2);
             led2_fade_in = 0;
         }
@@ -966,8 +967,6 @@ int main(void)
                     led2_active = 0;
                 } else {
                     led2_active = 1; //led is being used
-                    //for testing
-                    //P1OUT ^= BIT6;
                     //set the brightness to max
                     brightness_2 = max_brightness;
                     light_flag_2 = 1;
@@ -1166,7 +1165,6 @@ int main(void)
                     led3_active = 0;
                 } else {
                     led3_active = 1; //led is being used
-                    //for testing
                     //set the brightness to max
                     brightness_3 = max_brightness;
                     light_flag_3 = 1;
@@ -1332,9 +1330,10 @@ __interrupt void Timer0_A1(void){
                 send[1][1] = timer_count; //the time held
 
                 //wanted output for testing should be set here, some were used during initial testing, uncomment for use
-                led3_breath = 1;
+                //led2_breath = 1;
                 //led1_fade_out = 1;
                 //buzzer_beep = -1;
+
                 held = 0;                               //button has now been released
                 //set timer count to 0
                 TA0CCR1 = 0;
@@ -1345,7 +1344,6 @@ __interrupt void Timer0_A1(void){
                  timer_count = 0;                     //Reset the timer count
                  pressed = 0;                        //reset pressed
                  held = 1;                           //Button is being held
-                 //P1OUT ^= BIT6;
                  //offset TA0CCR0 by the count number/period
                  //change the value held in the array
                  timers_used[0][1] = count_b;
@@ -1370,7 +1368,7 @@ __interrupt void Timer0_A1(void){
                 send[1][1] = timer_count2; //the time held
 
                 //testing outputs should be activated here
-                buzzer_beep = -1;
+                //buzzer_beep = -1;
 
                 held2 = 0;                               //button has now been released
 
@@ -1617,9 +1615,6 @@ __interrupt void Timer0_A1(void){
                 send[0][1] = 1; //set flag
                 send[1][1] = timer_count; //the time held
 
-                //led3_rot = 1;
-                //testing with light first
-               // P1OUT ^= BIT0;
                 held = 0;                               //button has now been released
                 TA0CCR2 = 0;
             }
@@ -1654,7 +1649,9 @@ __interrupt void Timer0_A1(void){
 
                 //testing values for second button
                 //led3_breath = 1;
-                buzzer_beep = -1;
+                //led1_fade_out = 1;
+                //buzzer_beep = -1;
+
                 held2 = 0;                               //button has now been released
                 TA0CCR2 = 0;
             }
@@ -1980,9 +1977,6 @@ __interrupt void Timer1_A0 (void)
             send[0][1] = 1; //set flag
             send[1][1] = timer_count; //the time held
 
-            led1_blink = 1;
-            //testing with light first
-           // P1OUT ^= BIT0;
             held = 0;                               //button has now been released
             TA1CCR0 = 0;
         }
@@ -1992,7 +1986,7 @@ __interrupt void Timer1_A0 (void)
              timer_count = 0;                     //Reset the timer count
              pressed = 0;                        //reset pressed
              held = 1;                           //Button is being held
-             P1OUT ^= BIT6;
+
              //offset TA0CCR0 by the count number/period
              //change the value held in the array
              timers_used[0][3] = count_b;
@@ -2132,6 +2126,7 @@ __interrupt void Timer1_A0 (void)
         P2OUT = colours[colour];
         TA1CCR0 += blink_rate_3;
     }
+
     //LED3 blink
     if(led3_blink == 3){
         if(led3_blink_on){
@@ -2236,9 +2231,6 @@ __interrupt void Timer1_A1(void){
                 send[0][1] = 1; //set flag
                 send[1][1] = timer_count; //the time held
 
-                led1_blink = 1;
-                //testing with light first
-               // P1OUT ^= BIT0;
                 held = 0;                               //button has now been released
                 TA1CCR1 = 0;
             }
@@ -2248,7 +2240,7 @@ __interrupt void Timer1_A1(void){
                  timer_count = 0;                     //Reset the timer count
                  pressed = 0;                        //reset pressed
                  held = 1;                           //Button is being held
-                 P1OUT ^= BIT6;
+
                  //offset TA0CCR0 by the count number/period
                  //change the value held in the array
                  timers_used[0][4] = count_b;
@@ -2629,7 +2621,6 @@ __interrupt void Timer1_A1(void){
                 send[0][1] = 1; //set flag
                 send[1][1] = timer_count; //the time held
 
-                led1_blink = 1;
                 held = 0;                               //button has now been released
                 TA1CCR2 = 0;
 
@@ -2640,7 +2631,7 @@ __interrupt void Timer1_A1(void){
                  timer_count = 0;                     //Reset the timer count
                  pressed = 0;                        //reset pressed
                  held = 1;                           //Button is being held
-                 P1OUT ^= BIT6;
+
                  //offset TA0CCR0 by the count number/period
                  //change the value held in the array
                  timers_used[0][5] = count_b;
@@ -3090,9 +3081,9 @@ int activate_timer(int timer_no, int count){
 }
 
 /**
- * function for checking which timer is free, takes in the number of CCR registers wanted,
+ * Function for checking which timer is free, takes in the number of CCR registers wanted,
  * an array for the counts to use for the registers, and a boolean to indicate if the timer needs to be on its own
- * if alone is 1 then requested CCR needs to be on its own, else can share
+ * if alone is 1 then requested CCR needs to be on its own, else can share.
  * Prioritises activation of timers with same CCR value that are not specified as alone
  * returns 1 for success, otherwise 0. changes the activated_timers array to indicate which timers were activated
  */
@@ -3366,7 +3357,7 @@ int activate_free_timer(int registers, int counts[], int alone){
 }
 
 /**
- * function to turn off the timers activated - or set the count value to 0,
+ * Function to turn off the timers activated - or set the count value to 0,
  * Takes in the array of activated timers, and the length of the array
  * check if each value is now zero so the full timer should be turned off
  * returns nothing, changes the timers_used array to reflect the deactivations
