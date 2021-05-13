@@ -259,8 +259,8 @@ int main(void)
 	//Inputs
 	//button = 1;           //Button 1
 	//button2 = 1;          //Button 2
-	//pot = 1;              //Potentiometer
-	//thermometer = 1;      //Thermometer
+	//pot = 1;              //Potentiometer, there is a test case in the potentiometer activation that can be uncommented for use
+	//thermometer = 1;      //Thermometer, same for the thermometer, uncomment test case for over or under 18C
 
 	//Outputs, these can be activated here or copied over to the timer interrupts to be activat3ed by input events
 	//led1_on = 1;          //LED D1 (green) on, to turn off assign value -1
