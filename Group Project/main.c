@@ -249,10 +249,10 @@ int main(void)
 	 */
 
 	//Inputs
-	button = 1;           //Button 1
-	button2 = 1;          //Button 2
-	pot = 1;              //Potentiometer
-	thermometer = 1;      //Thermometer
+	//button = 1;           //Button 1
+	//button2 = 1;          //Button 2
+	//pot = 1;              //Potentiometer
+	//thermometer = 1;      //Thermometer
 
 	//Outputs, these can be activated here or copied over to the timer interrupts to be activat3ed by input events
 	//led1_on = 1;          //LED D1 (green) on, to turn off assign value -1
@@ -264,19 +264,19 @@ int main(void)
 	//led2_on = 1;          //LED D2 (red) on, to turn off assign value -1
     //led2_blink = 1;       //LED D2 blink at default rate, this rate can be altered by altering the blink_rate_2 variable
     //led2_fade_in = 1;     //LED D2 fade in at default rate, this can be specified by assigning one of the blink_rate variables to period_2
-    //led2_fade_out = 1'     //LED D2 fade out at default rate, can be specified in the same manner as fade in
-    //led2_breath = 1;      //LED D2 breathing light, at default rate, can be specified in the same manner as fade
+    //led2_fade_out = 1;     //LED D2 fade out at default rate, can be specified in the same manner as fade in
+	//led2_breath = 1;      //LED D2 breathing light, at default rate, can be specified in the same manner as fade
 
 	//led3_on = 1;          //LED D3 colour can be specified by setting a number between 0 and 5, on, to turn off assign value -1
     //led3_rot = 1;         //LED D3 rotating light, direction is determined by dir, if dir = 0 then no rotation will take place dir = 1 is forward and dir = -1 backwards
 	//led3_blink = 1;       //LED D3 blink at default rate, this rate can be altered by altering the blink_rate_2 variable, if dir is set to 1 or -1 this will also rotate
     //led3_fade_in = 1;     //LED D3 fade in at default rate, this can be specified by assigning one of the blink_rate variables to period_3
-    //led3_fad_out = 1'     //LED D3 fade out at default rate, can be specified in the same manner as fade in
-    //led3_breath = 1;      //LED D3 breathing light, at default rate, can be specified in the same manner as fade, if dir is set this will rotate
-	//led3_dir = 1          //Used to set rotation direction for LED 3,
+    //led3_fad_out = 1;     //LED D3 fade out at default rate, can be specified in the same manner as fade in
+    led3_breath = 1;      //LED D3 breathing light, at default rate, can be specified in the same manner as fade, if dir is set this will rotate
+	led3_dir = 1;          //Used to set rotation direction for LED 3,
 
 	//buzzer_tone = 1;      //Buzzer on for a specific duration, currently default duration, this can be specified by setting the buzzer_duration variable
-	buzzer_beep = 1;      //Buzzer beeping until stopped (highly recommended to use this in conjunction with an input to stop it as buzzer_beep needs to be set to -1 to deactivate
+	//buzzer_beep = 1;      //Buzzer beeping until stopped (highly recommended to use this in conjunction with an input to stop it as buzzer_beep needs to be set to -1 to deactivate
 	                        //On duration and off duration of the beeps is set separately, currently default, can be changed by setting buzzer_duration, and buzzer_duration_off
 
 
@@ -1311,8 +1311,8 @@ __interrupt void Timer0_A1(void){
                 send[1][1] = timer_count; //the time held
 
                 //wanted output for testing should be set here, some were used during initial testing, uncomment for use
-                //led2_breath = 1;
-                led2_fade_out = 1;
+                led3_breath = 1;
+                //led1_fade_out = 1;
                 //buzzer_beep = -1;
                 held = 0;                               //button has now been released
                 //set timer count to 0
