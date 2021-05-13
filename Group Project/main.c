@@ -217,7 +217,7 @@ int main(void)
 
 	/**
 	 * Variables for testing
-	 * Un-comment the features wanted, then select debug and run. Ensure all external devices are
+	 * Uncomment the features wanted, then select debug and run. Ensure all external devices are
 	 * connected as per the diagram in the design specifications as these will not function otherwise.
 	 *
 	 * For features connected to inputs the required affecting output needs to be specified
@@ -266,13 +266,13 @@ int main(void)
 	//led1_on = 1;          //LED D1 (green) on, to turn off assign value -1
 	//led1_blink = 1;       //LED D1 blink at default rate, this rate can be altered by altering the blink_rate_1 variable
 	//led1_fade_in = 1;     //LED D1 fade in at default rate, this can be specified by assigning one of the blink_rate variables to period_1
-	//led1_fade_out = 1;     //LED D1 fade out at default rate, can be specified in the same manner as fade in
+	//led1_fade_out = 1;    //LED D1 fade out at default rate, can be specified in the same manner as fade in
 	//led1_breath = 1;      //LED D1 breathing light, at default rate, can be specified in the same manner as fade
 
 	//led2_on = 1;          //LED D2 (red) on, to turn off assign value -1
     //led2_blink = 1;       //LED D2 blink at default rate, this rate can be altered by altering the blink_rate_2 variable
     //led2_fade_in = 1;     //LED D2 fade in at default rate, this can be specified by assigning one of the blink_rate variables to period_2
-    //led2_fade_out = 1;     //LED D2 fade out at default rate, can be specified in the same manner as fade in
+    //led2_fade_out = 1;    //LED D2 fade out at default rate, can be specified in the same manner as fade in
 	//led2_breath = 1;      //LED D2 breathing light, at default rate, can be specified in the same manner as fade
 
 	//led3_on = 1;          //LED D3 colour can be specified by setting a number between 0 and 5, on, to turn off assign value -1
@@ -281,7 +281,7 @@ int main(void)
     //led3_fade_in = 1;     //LED D3 fade in at default rate, this can be specified by assigning one of the blink_rate variables to period_3
     //led3_fad_out = 1;     //LED D3 fade out at default rate, can be specified in the same manner as fade in
     //led3_breath = 1;      //LED D3 breathing light, at default rate, can be specified in the same manner as fade, if dir is set this will rotate
-	//led3_dir = 1;          //Used to set rotation direction for LED 3,
+	//led3_dir = 1;         //Used to set rotation direction for LED 3,
 
 	//buzzer_tone = 1;      //Buzzer on for a specific duration, currently default duration, this can be specified by setting the buzzer_duration variable
 	//buzzer_beep = 1;      //Buzzer beeping until stopped (highly recommended to use this in conjunction with an input to stop it as buzzer_beep needs to be set to -1 to deactivate
