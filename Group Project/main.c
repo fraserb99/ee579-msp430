@@ -14,7 +14,7 @@
  *
  * Timers are allocated dynamically based on activation of function (input/output)
  * For any initialisation in the same occurrence of a while loop the functionalities
- * will be allocated timers depending on order of first encounter ie :
+ * will be allocated timers depending on order of first encounter ie:
  * Button 1, Button 2, Potentiometer, Thermometer, LED 1, LED 2, LED 3, Buzzer and
  * their related configurations.
  * The exact order of these can be found in the while loop in the main function.
@@ -282,6 +282,7 @@ int main(void)
     //led3_fad_out = 1;     //LED D3 fade out at default rate, can be specified in the same manner as fade in
     //led3_breath = 1;      //LED D3 breathing light, at default rate, can be specified in the same manner as fade, if dir is set this will rotate
 	//led3_dir = 1;         //Used to set rotation direction for LED 3,
+	//colour = 0;           //Used to specify a specific start colour of LED 3
 
 	//buzzer_tone = 1;      //Buzzer on for a specific duration, currently default duration, this can be specified by setting the buzzer_duration variable
 	//buzzer_beep = 1;      //Buzzer beeping until stopped (highly recommended to use this in conjunction with an input to stop it as buzzer_beep needs to be set to -1 to deactivate
