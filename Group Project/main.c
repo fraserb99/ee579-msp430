@@ -229,6 +229,14 @@ int main(void)
 	 * therefore any required output should be activated in those corresponding timers.
 	 * If only Button 2 was selected then this would be allocated A0_1.
 	 *
+	 * The value of the thermometer and the potentiometer can be seen by pausing the running and
+	 * selecting expressions in the top right pane. Here the value_temp shows the temperature
+	 * value in degrees Celsius, and the value shows the outut from the potentiometer.
+	 * There are two other expressions here as well, temp is the value of the thermometer before
+	 * the conversion to Celsius, and orig_val is the value of the potentiometer for the previous
+	 * measured value that were of a specific step size, in other words the value and orig_val
+	 * can show how much the potentiometer value has changed.
+	 *
 	 * Please note that while any inputs wanted can be selected at once, however this will affect
 	 * the timers and hence the availability of the outputs as there are only a possible number
 	 * of 5 timer Capture Compare Registers of which 1 is required per each input, and a mix of
@@ -251,7 +259,7 @@ int main(void)
 	//Inputs
 	//button = 1;           //Button 1
 	//button2 = 1;          //Button 2
-	//pot = 1;              //Potentiometer
+	pot = 1;              //Potentiometer
 	//thermometer = 1;      //Thermometer
 
 	//Outputs, these can be activated here or copied over to the timer interrupts to be activat3ed by input events
@@ -272,8 +280,8 @@ int main(void)
 	//led3_blink = 1;       //LED D3 blink at default rate, this rate can be altered by altering the blink_rate_2 variable, if dir is set to 1 or -1 this will also rotate
     //led3_fade_in = 1;     //LED D3 fade in at default rate, this can be specified by assigning one of the blink_rate variables to period_3
     //led3_fad_out = 1;     //LED D3 fade out at default rate, can be specified in the same manner as fade in
-    led3_breath = 1;      //LED D3 breathing light, at default rate, can be specified in the same manner as fade, if dir is set this will rotate
-	led3_dir = 1;          //Used to set rotation direction for LED 3,
+    //led3_breath = 1;      //LED D3 breathing light, at default rate, can be specified in the same manner as fade, if dir is set this will rotate
+	//led3_dir = 1;          //Used to set rotation direction for LED 3,
 
 	//buzzer_tone = 1;      //Buzzer on for a specific duration, currently default duration, this can be specified by setting the buzzer_duration variable
 	//buzzer_beep = 1;      //Buzzer beeping until stopped (highly recommended to use this in conjunction with an input to stop it as buzzer_beep needs to be set to -1 to deactivate
