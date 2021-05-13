@@ -7,8 +7,8 @@
 /**
  * WiFi setup
  */
-#define IOT_CONFIG_WIFI_SSID            "TALKTALK9A8AD1"
-#define IOT_CONFIG_WIFI_PASSWORD        "GHQNHTXQ"
+#define IOT_CONFIG_WIFI_SSID            "YOUR WIFI SSID HERE"
+#define IOT_CONFIG_WIFI_PASSWORD        "YOUR WIFI PASSWORD HERE "
 
 /**
  * IoT Hub Device Connection String setup
@@ -16,7 +16,7 @@
  * navigating to IoT Devices tab on the left, and creating (or selecting an existing) IoT Device. 
  * Then click on the named Device ID, and you will have able to copy the Primary or Secondary Device Connection String to this sample.
  */
-#define DEVICE_CONNECTION_STRING    "HostName=IFTTT-Iot-Hub.azure-devices.net;DeviceId=00:0a:95:9d:68:16;SharedAccessKey=El50EkQ/S/9qp5dd/V3VpsizIvSv+SA8TVF3QiGc93A="
+#define DEVICE_CONNECTION_STRING    "IF KNOWN, DEVICE CONNECTION STRING HERE"
 
 // The protocol you wish to use should be uncommented
 //
